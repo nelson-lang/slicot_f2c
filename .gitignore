@@ -30,3 +30,9 @@
 *.exe
 *.out
 *.app
+
+# F2C destination
+/c
+
+# binary destination
+/bin
