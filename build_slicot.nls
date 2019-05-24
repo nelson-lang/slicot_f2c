@@ -16,7 +16,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // LICENCE_BLOCK_END
 //=============================================================================
+configure_compiler = false;
 if ispc()
+  configure_compiler = true;
   configuremsvc();
 end
 //=============================================================================
@@ -63,6 +65,9 @@ if ~status
 end
 //=============================================================================
 [status, message] = dlmake(destinationdir);
+if configure_compiler
+  removecompilerconf();
+end
 if ~status
   error(message);
   exit(1);
