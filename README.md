@@ -10,11 +10,4 @@ at Nelson's prompt go to this directory and type:
 run('build_slicot.nls');
 ```
 
-
-generated dynamic library will be available in bin directory. 
-
-copy it in
- 
-```bash
-modulepath(nelsonroot,'core','bin') 
-```
+generated dynamic library will be copy in nelson's bin directory if rights are allowed. 

@@ -67,6 +67,11 @@ if ~status
   error(message);
   exit(1);
 else
+  try
+   copyfile([destinationdir, 'libslicot', getdynlibext()], [modulepath(nelsonroot,'core','bin'), '/libslicot', getdynlibext()]);
+  catch
+    exit(1);
+  end
   exit();
 end
 //=============================================================================
