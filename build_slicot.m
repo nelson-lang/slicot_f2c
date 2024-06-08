@@ -49,10 +49,10 @@ end
 currentpath = fileparts(nfilename('fullpathext'));
 %=============================================================================
 if ispc()
-  external_libs = {[modulepath(nelsonroot(),'elementary_functions','bin'), '/libnlsblaslapack']; ...
-  [modulepath(nelsonroot(),'f2c','bin'), '/libnlsF2C']};
+  external_libs = {[modulepath('elementary_functions','bin'), '/libnlsblaslapack']; ...
+  [modulepath('f2c','bin'), '/libnlsF2C']};
 else
-  external_libs = {[modulepath(nelsonroot(),'f2c','bin'), '/libnlsF2C']; ...
+  external_libs = {[modulepath('f2c','bin'), '/libnlsF2C']; ...
   'blas'; 'lapack'};
 end
 [status, message] = dlgeneratemake(destinationdir, ...
@@ -73,7 +73,7 @@ if ~status
   exit(1);
 else
   try
-    copyfile([destinationdir, 'libslicot', getdynlibext()], [modulepath(nelsonroot,'core','bin'), '/libslicot', getdynlibext()]);
+    copyfile([destinationdir, 'libslicot', getdynlibext()], [modulepath('core','bin'), '/libslicot', getdynlibext()]);
   catch
     exit(1);
   end
