@@ -1,24 +1,6 @@
-      SUBROUTINE MB04QC( STRUCT, TRANA, TRANB, TRANQ, DIRECT, STOREV,
+      SUBROUTINE MB04QC( STRAB, TRANA, TRANB, TRANQ, DIRECT, STOREV,
      $                   STOREW, M, N, K, V, LDV, W, LDW, RS, LDRS, T,
      $                   LDT, A, LDA, B, LDB, DWORK )
-C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
 C
 C     PURPOSE
 C
@@ -43,7 +25,7 @@ C     ARGUMENTS
 C
 C     Mode Parameters
 C
-C     STRUCT  CHARACTER*1
+C     STRAB   CHARACTER*1
 C             Specifies the structure of the first blocks of A and B:
 C             = 'Z':  the leading K-by-N submatrices of op(A) and op(B)
 C                     are (implicitly) assumed to be zero;
@@ -173,8 +155,8 @@ C
 C     Workspace
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK), where
-C             LDWORK >= 8*N*K,   if STRUCT = 'Z',
-C             LDWORK >= 9*N*K,   if STRUCT = 'N'.
+C             LDWORK >= 8*N*K,   if STRAB = 'Z',
+C             LDWORK >= 9*N*K,   if STRAB = 'N'.
 C
 C     REFERENCES
 C
@@ -185,8 +167,8 @@ C
 C     NUMERICAL ASPECTS
 C
 C     The algorithm requires 16*( M - K )*N + ( 26*K - 4 )*K*N floating
-C     point operations if STRUCT = 'Z' and additional ( 12*K + 2 )*K*N
-C     floating point operations if STRUCT = 'N'.
+C     point operations if STRAB = 'Z' and additional ( 12*K + 2 )*K*N
+C     floating point operations if STRAB = 'N'.
 C
 C     CONTRIBUTORS
 C
@@ -196,6 +178,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DLAESB).
+C     P. Gahinet, The MathWorks, Natick, U.S.A., Mar. 2011.
 C
 C     KEYWORDS
 C
@@ -207,7 +190,7 @@ C     .. Parameters ..
       DOUBLE PRECISION  ZERO, ONE
       PARAMETER         ( ZERO = 0.0D0, ONE = 1.0D0 )
 C     .. Scalar Arguments ..
-      CHARACTER         DIRECT, STOREV, STOREW, STRUCT, TRANA, TRANB,
+      CHARACTER         DIRECT, STOREV, STOREW, STRAB, TRANA, TRANB,
      $                  TRANQ
       INTEGER           K, LDA, LDB, LDRS, LDT, LDV, LDW, M, N
 C     .. Array Arguments ..
@@ -232,7 +215,7 @@ C     Quick return if possible.
 C
       IF ( M.LE.0 .OR. N.LE.0 )
      $   RETURN
-      LA1B1 = LSAME( STRUCT, 'N' )
+      LA1B1 = LSAME( STRAB, 'N' )
       LCOLV = LSAME( STOREV, 'C' )
       LCOLW = LSAME( STOREW, 'C' )
       LTRA  = LSAME( TRANA,  'T' ) .OR. LSAME( TRANA, 'C' )

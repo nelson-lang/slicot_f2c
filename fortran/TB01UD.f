@@ -2,24 +2,6 @@
      $                   INDCON, NBLK, Z, LDZ, TAU, TOL, IWORK, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To find a controllable realization for the linear time-invariant
@@ -233,7 +215,8 @@ C     V. Sima, Katholieke Univ. Leuven, Belgium, Feb. 1998.
 C
 C     REVISIONS
 C
-C     V. Sima, Katholieke Univ. Leuven, Belgium, May 1999, Nov. 2003.
+C     V. Sima, Katholieke Univ. Leuven, Belgium, May 1999, Nov. 2003,
+C     Mar. 2017.
 C     A. Varga, DLR Oberpfaffenhofen, March 2002, Nov. 2003.
 C
 C     KEYWORDS
@@ -264,8 +247,8 @@ C     .. Local Arrays ..
       DOUBLE PRECISION  SVAL(3)
 C     .. External Functions ..
       LOGICAL           LSAME
-      DOUBLE PRECISION  DLAMCH, DLANGE, DLAPY2
-      EXTERNAL          DLAMCH, DLANGE, DLAPY2, LSAME
+      DOUBLE PRECISION  DLAMCH, DLANGE
+      EXTERNAL          DLAMCH, DLANGE, LSAME
 C     .. External Subroutines ..
       EXTERNAL          DCOPY, DLACPY, DLAPMT, DLASET, DORGQR, DORMQR,
      $                  MB01PD, MB03OY, XERBLA
@@ -340,15 +323,14 @@ C
 C
 C     Compute the Frobenius norm of [ B  A ] (used for rank estimation).
 C
-      FNRM = DLAPY2( DLANGE( 'F', N, M, B, LDB, DWORK ),
-     $               DLANGE( 'F', N, N, A, LDA, DWORK ) )
+      FNRM = DLANGE( 'F', N, M, B, LDB, DWORK )
 C
       TOLDEF = TOL
       IF ( TOLDEF.LE.ZERO ) THEN
 C
 C        Use the default tolerance in controllability determination.
 C
-         TOLDEF = DBLE( N*N )*DLAMCH( 'EPSILON' )
+         TOLDEF = DBLE( N*N )*DLAMCH( 'Precision' )
       END IF
 C
       IF ( FNRM.LT.TOLDEF )
@@ -429,6 +411,7 @@ C
             IF ( INDCON.EQ.1 ) THEN
                CALL DLAPMT( .FALSE., RANK, M, B(IQR,1), LDB, IWORK )
                IQR = RANK + 1
+               FNRM = DLANGE( 'F', N, N, A, LDA, DWORK )
             ELSE
                DO 20 J = 1, MCRT
                   CALL DCOPY( RANK, B(IQR,J), 1, A(NI+1,NJ+IWORK(J)),

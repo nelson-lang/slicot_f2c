@@ -2,24 +2,6 @@
      $                   TOL, RELTOL, IWORK, DWORK, LDWORK, BWORK,
      $                   IWARN, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve the Total Least Squares (TLS) problem using a Partial
@@ -165,6 +147,12 @@ C             where
 C             LW = (N+L)*(N+L-1)/2,  if M >= N+L,
 C             LW = M*(N+L-(M-1)/2),  if M <  N+L.
 C             For optimum performance LDWORK should be larger.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     BWORK   LOGICAL array, dimension (N+L)
 C
@@ -372,7 +360,7 @@ C     University, Leuven, Belgium.
 C
 C     REVISIONS
 C
-C     June 30, 1997, Oct. 19, 2003, Feb. 15, 2004.
+C     V. Sima. June 30, 1997, Oct. 19, 2003, Feb. 15, 2004, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -392,14 +380,14 @@ C     .. Array Arguments ..
       INTEGER           IWORK(*)
       DOUBLE PRECISION  C(LDC,*), DWORK(*), Q(*), X(LDX,*)
 C     .. Local Scalars ..
-      LOGICAL           LFIRST, SUFWRK
+      LOGICAL           LFIRST, LQUERY, SUFWRK, USEQR
       INTEGER           I, I1, IFAIL, IHOUSH, IJ, IOFF, ITAUP, ITAUQ,
      $                  IWARM, J, J1, JF, JV, JWORK, K, KF, KJ, LDF, LW,
-     $                  MC, MJ, MNL, N1, NJ, NL, P, WRKOPT
+     $                  MC, MINWRK, MJ, MNL, N1, NJ, NL, P, WRKOPT
       DOUBLE PRECISION  CS, EPS, FIRST, FNORM, HH, INPROD, RCOND, SN,
      $                  TEMP
 C     .. Local Arrays ..
-      DOUBLE PRECISION  DUMMY(1)
+      DOUBLE PRECISION  DUMMY(2)
 C     .. External Functions ..
       LOGICAL           LSAME
       INTEGER           ILAENV
@@ -441,8 +429,38 @@ C
          INFO = -7
       ELSE IF( LDX.LT.MAX( 1, N ) ) THEN
          INFO = -9
-      ELSE IF( LDWORK.LT.MAX( 2, K + 2*P, JV ) ) THEN
-         INFO = -16
+      ELSE
+         USEQR = M.GE.MAX( NL, ILAENV( 6, 'DGESVD', 'N' // 'N', M, NL,
+     $                                 0, 0 ) )
+         LQUERY = LDWORK.EQ.-1
+         MINWRK = MAX( 2, K + 2*P, JV )
+         WRKOPT = MINWRK
+         IF ( USEQR ) THEN
+            MNL = NL
+         ELSE
+            MNL = M
+         END IF
+         IF( LQUERY ) THEN
+            IF ( USEQR ) THEN
+               CALL DGEQRF( M, NL, C, LDC, DWORK, DWORK, -1, IFAIL )
+               WRKOPT = MAX( WRKOPT, NL + INT( DWORK(1) ) )
+            END IF
+            CALL DGEBRD( MNL, NL, C, LDC, Q, Q, DWORK, DWORK, DWORK, -1,
+     $                   IFAIL )
+            CALL DORMBR( 'P vectors', 'Left', 'No transpose', NL, NL,
+     $                   MNL, DWORK, P, DWORK, DWORK, NL, DWORK(2), -1,
+     $                   IFAIL )
+            CALL DGERQF( L, NL, DWORK, NL, DWORK, DUMMY, -1, IFAIL )
+            CALL DORMRQ( 'Right', 'Transpose', N, NL, L, DWORK, NL,
+     $                   DWORK, DWORK, NL, DUMMY(2), -1, IFAIL )
+            TEMP   = MAX( DWORK(2), DUMMY(1), DUMMY(2) )
+            WRKOPT = MAX( WRKOPT, 2*P + INT( DWORK(1) ), 
+     $                    P + P*NL + MAX( 6*NL-5,
+     $                                    NL**2 + MAX( INT( TEMP ),
+     $                                                 3*L ) ) )
+         END IF
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY )
+     $       INFO = -16
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -450,6 +468,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'MB02ND', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C
@@ -505,9 +526,7 @@ C     code, as well as the preferred amount for good performance.
 C     NB refers to the optimal block size for the immediately
 C     following subroutine, as returned by ILAENV.)
 C
-      IF ( M.GE.MAX( NL,
-     $               ILAENV( 6, 'DGESVD', 'N' // 'N', M, NL, 0, 0 ) ) )
-     $      THEN
+      IF ( USEQR ) THEN
 C
 C        Workspace: need   2*(N+L),
 C                   prefer N+L + (N+L)*NB.
@@ -519,9 +538,6 @@ C
          WRKOPT = MAX( WRKOPT, INT( DWORK(JWORK) )+JWORK-1 )
          IF ( NL.GT.1 )
      $      CALL DLASET( 'Lower', NL-1, NL-1, ZERO, ZERO, C(2,1), LDC )
-         MNL = NL
-      ELSE
-         MNL = M
       END IF
 C
 C     1.b): Transform C (or R) into bidiagonal form Q using Householder
@@ -563,7 +579,7 @@ C
       IHOUSH = ITAUQ
       MC = NL - IOFF
       KF = IHOUSH + P*NL
-      SUFWRK = LDWORK.GE.( KF + MAX( 6*(N+L)-5,
+      SUFWRK = LDWORK.GE.( KF + MAX( 6*NL-5,
      $                               NL**2 + MAX( NL, 3*L ) - 1 ) )
       IF ( SUFWRK ) THEN
 C

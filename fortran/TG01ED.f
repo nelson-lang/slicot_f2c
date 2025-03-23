@@ -2,24 +2,6 @@
      $                   C, LDC, Q, LDQ, Z, LDZ, RANKE, RNKA22, TOL,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute for the descriptor system (A-lambda E,B,C)
@@ -232,7 +214,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, July 1999,
-C     Feb. 2000, Oct. 2001, May 2003.
+C     Feb. 2000, Oct. 2001, May 2003, Feb. 2017, June 2017.
 C
 C     KEYWORDS
 C
@@ -333,11 +315,9 @@ C
          TOLDEF = EPSM * DBLE( L*N )
       END IF
 C
-C     Set the estimate of the maximum singular value of E to
-C     max(||E||,||A||) to detect negligible A or E matrices.
+C     Set the estimate of the maximum singular value of E to ||E||_F.
 C
-      SVLMAX = MAX( DLANGE( 'F', L, N, E, LDE, DWORK ) ,
-     $              DLANGE( 'F', L, N, A, LDA, DWORK ) )
+      SVLMAX = DLANGE( 'Frobenius', L, N, E, LDE, DWORK )
 C
 C     Compute the SVD of E
 C
@@ -360,7 +340,7 @@ C
 C     Determine the rank of E.
 C
       RANKE = 0
-      IF( DWORK(1).GT.SVLMAX*EPSM ) THEN
+      IF( DWORK(1).GT.TOLDEF ) THEN
          RANKE = 1
          SVEMAX = DWORK(1)
          DO 10 I = 2, LN
@@ -428,6 +408,11 @@ C
             IR1 = 1
             RNKA22 = 0
          ELSE
+C
+C           Set the estimate of maximum singular value of A to detect 
+C           a negligible A22 submatrix.
+C
+            SVLMAX = DLANGE( 'Frobenius', L, N, A, LDA, DWORK )
 C
 C           Compute the SVD of A22 using a storage saving approach.
 C

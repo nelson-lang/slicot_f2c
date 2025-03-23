@@ -2,24 +2,6 @@
      $                   Z, LDZ, Y, COUNT, G, LDG, TOL, IWORK, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute for a controllable matrix pair ( A, B ) a matrix G
@@ -193,7 +175,8 @@ C     version.
 C
 C     REVISIONS
 C
-C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2005.
+C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2005,
+C     Apr. 2017.
 C
 C     KEYWORDS
 C
@@ -223,7 +206,7 @@ C     .. Local Scalars ..
       INTEGER            I, IA, INDCN1, INDCN2, INDCRT, IP, IRMX, IWRK,
      $                   K, KK, KMR, L, LP1, M1, MAXWRK, MI, MP1, MR,
      $                   MR1, NBLKCR, NC, NI, NJ, NP1, NR, NR1, RANK
-      DOUBLE PRECISION   P, Q, R, S, SVLMAX, TOLDEF
+      DOUBLE PRECISION   P, Q, R, S, SVLMXA, SVLMXB, TOLDEF
 C     ..
 C     .. Local Arrays ..
       DOUBLE PRECISION   SVAL( 3 )
@@ -308,17 +291,18 @@ C     taking into account the structure.
 C
       NR = M1
       NC = 1
-      SVLMAX = DLANGE( 'Frobenius', M1, M, B, LDB, DWORK )
+      SVLMXB = DLANGE( 'Frobenius', M1, M, B, LDB, DWORK )
+      SVLMXA = ZERO
 C
       DO 20 I = 1, INDCRT - 1
          NR = NR + NBLK( I+1 )
-         SVLMAX = DLAPY2( SVLMAX,
+         SVLMXA = DLAPY2( SVLMXA,
      $                    DLANGE( 'Frobenius', NR, NBLK( I ),
      $                            A( 1, NC ), LDA, DWORK ) )
          NC = NC + NBLK( I )
    20 CONTINUE
 C
-      SVLMAX = DLAPY2( SVLMAX,
+      SVLMXA = DLAPY2( SVLMXA,
      $                 DLANGE( 'Frobenius', N, NBLKCR, A( 1, NC ), LDA,
      $                         DWORK ) )
       L  = 1
@@ -345,7 +329,7 @@ C
             NC = 2
          END IF
 C
-C        Compute and transform eiegenvector.
+C        Compute and transform eigenvector.
 C
          DO 50 IP = 1, INDCRT
             IF( IP.NE.INDCRT ) THEN
@@ -395,7 +379,7 @@ C
 C              Solve linear equations for eigenvector elements.
 C
                CALL MB02QD( 'FreeElements', 'NoPermuting', MR, MR1, NC,
-     $                      TOLDEF, SVLMAX, DWORK( IRMX ), M,
+     $                      TOLDEF, SVLMXA, DWORK( IRMX ), M,
      $                      DWORK( NR1 ), N, Y( COUNT ), IWORK, RANK,
      $                      SVAL, DWORK( IWRK ), LDWORK-IWRK+1, INFO )
                MAXWRK = MAX( MAXWRK, INT( DWORK( IWRK ) ) + IWRK - 1 )
@@ -515,7 +499,7 @@ C
          END IF
 C
          CALL MB02QD( 'FreeElements', 'NoPermuting', M1, M, NC, TOLDEF,
-     $                SVLMAX, DWORK( IRMX ), M, G( 1, L ), LDG,
+     $                SVLMXB, DWORK( IRMX ), M, G( 1, L ), LDG,
      $                Y( COUNT ), IWORK, RANK, SVAL, DWORK( IWRK ),
      $                LDWORK-IWRK+1, INFO )
          MAXWRK = MAX( MAXWRK, INT( DWORK( IWRK ) ) + IWRK - 1 )
@@ -606,7 +590,7 @@ C        UNTIL I.GE.MR
 C
          CALL DLACPY( 'Full', MR, M, B( L, 1 ), LDB, DWORK( IRMX ), M )
          CALL MB02QD( 'FreeElements', 'NoPermuting', MR, M, MR, TOLDEF,
-     $                SVLMAX, DWORK( IRMX ), M, G( 1, L ), LDG,
+     $                SVLMXB, DWORK( IRMX ), M, G( 1, L ), LDG,
      $                Y( COUNT ), IWORK, RANK, SVAL, DWORK( IWRK ),
      $                LDWORK-IWRK+1, INFO )
          MAXWRK = MAX( MAXWRK, INT( DWORK( IWRK ) ) + IWRK - 1 )

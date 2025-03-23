@@ -1,36 +1,19 @@
       SUBROUTINE MB03GD( N, B, LDB, D, LDD, MACPAR, Q, LDQ, U, LDU,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute an orthogonal matrix Q and an orthogonal symplectic
 C     matrix U for a real regular 2-by-2 or 4-by-4 skew-Hamiltonian/
 C     Hamiltonian pencil a J B' J' B - b D with
 C
-C           ( B11  B12 )      (  D11  D12  )
-C       B = (          ), D = (            ),
-C           (  0   B22 )      (   0  -D11' )
+C           ( B11  B12 )      (  D11  D12  )      (  0  I  )
+C       B = (          ), D = (            ), J = (        ),
+C           (  0   B22 )      (   0  -D11' )      ( -I  0  )
 C
 C     such that J Q' J' D Q and U' B Q keep block triangular form, but
-C     the eigenvalues are reordered.
+C     the eigenvalues are reordered. The notation M' denotes the
+C     transpose of the matrix M.
 C
 C     ARGUMENTS
 C
@@ -118,6 +101,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Nov. 2009, July 2010, Nov. 2010.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C

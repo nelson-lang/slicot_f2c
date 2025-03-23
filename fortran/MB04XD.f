@@ -2,24 +2,6 @@
      $                   V, LDV, Q, INUL, TOL, RELTOL, DWORK, LDWORK,
      $                   IWARN, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a basis for the left and/or right singular subspace of
@@ -201,6 +183,12 @@ C                LDY = 8*P - 5, if JOBU <> 'N' or  JOBV <> 'N';
 C                LDY = 6*P - 3, if JOBU =  'N' and JOBV =  'N'.
 C             For optimum performance LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Warning Indicator
 C
 C     IWARN   INTEGER
@@ -330,7 +318,7 @@ C     University Leuven, Belgium.
 C
 C     REVISIONS
 C
-C     July 10, 1997.
+C     V. Sima, July 10, 1997, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -351,10 +339,10 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), DWORK(*), Q(*), U(LDU,*), V(LDV,*)
 C     .. Local Scalars ..
       CHARACTER*1       JOBUY, JOBVY
-      LOGICAL           ALL, LJOBUA, LJOBUS, LJOBVA, LJOBVS, QR, WANTU,
-     $                  WANTV
+      LOGICAL           ALL, LJOBUA, LJOBUS, LJOBVA, LJOBVS, LQUERY, QR,
+     $                  WANTU, WANTV
       INTEGER           I, IHOUSH, IJ, ITAU, ITAUP, ITAUQ, J, JU, JV,
-     $                  JWORK, K, LDW, LDY, MA, P, PP1, WRKOPT
+     $                  JWORK, K, LDW, LDY, MA, MINWRK, P, PP1, WRKOPT
       DOUBLE PRECISION  CS, SN, TEMP
 C     .. External Functions ..
       LOGICAL           LSAME
@@ -368,7 +356,7 @@ C     .. Intrinsic Functions ..
 C     .. Executable Statements ..
 C
       IWARN = 0
-      INFO = 0
+      INFO  = 0
       P = MIN( M, N )
       K = MAX( M, N )
 C
@@ -380,18 +368,7 @@ C
       LJOBVS = LSAME( JOBV, 'S' )
       WANTU  = LJOBUA.OR.LJOBUS
       WANTV  = LJOBVA.OR.LJOBVS
-      ALL = ( LJOBUA .AND. M.GT.N ) .OR. ( LJOBVA .AND. M.LT.N )
-      QR  = M.GE.ILAENV( 6, 'DGESVD', 'N' // 'N', M, N, 0, 0 )
-      IF ( QR.AND.WANTU ) THEN
-         LDW = MAX( 2*N, N*( N + 1 )/2 )
-      ELSE
-         LDW = 0
-      END IF
-      IF ( WANTU.OR.WANTV ) THEN
-         LDY = 8*P - 5
-      ELSE
-         LDY = 6*P - 3
-      END IF
+      LQUERY = LDWORK.EQ.-1
 C
 C     Test the input scalar arguments.
 C
@@ -415,8 +392,37 @@ C
       ELSE IF( ( .NOT.WANTV .AND. LDV.LT.1 )             .OR.
      $         (      WANTV .AND. LDV.LT.MAX( 1, N ) ) ) THEN
          INFO = -12
-      ELSE IF( LDWORK.LT.MAX( 1, LDW + MAX( 2*P + K, LDY ) ) ) THEN
-         INFO = -18
+      ELSE
+C
+C        Compute workspace.
+C
+         QR = M.GE.ILAENV( 6, 'DGESVD', 'N' // 'N', M, N, 0, 0 )
+         IF ( QR.AND.WANTU ) THEN
+            LDW = MAX( 2*N, N*( N + 1 )/2 )
+         ELSE
+            LDW = 0
+         END IF
+         IF ( WANTU.OR.WANTV ) THEN
+            LDY = 8*P - 5
+         ELSE
+            LDY = 6*P - 3
+         END IF
+         MINWRK = MAX( 1, LDW + MAX( 2*P + K, LDY ) )
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY ) THEN
+            INFO = -18
+         ELSE IF( LQUERY ) THEN
+            IF ( QR ) THEN
+               CALL DGEQRF( M, N, A, LDA, DWORK, DWORK, -1, INFO )
+               WRKOPT = MAX( MINWRK, N + INT( DWORK(1) ) )
+               MA = N
+            ELSE
+               WRKOPT = MINWRK
+               MA = M
+            END IF
+            CALL DGEBRD( MA, N, A, LDA, Q, Q, DWORK, DWORK, DWORK, -1,
+     $                   INFO )
+            WRKOPT = MAX( WRKOPT, LDW + 2*P + INT( DWORK(1) ) )
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -424,6 +430,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'MB04XD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C
@@ -439,6 +448,7 @@ C
 C     Initializations.
 C
       PP1 = P + 1
+      ALL = ( LJOBUA .AND. M.GT.N ) .OR. ( LJOBVA .AND. M.LT.N )
 C
       IF ( ALL .AND. ( .NOT.QR ) ) THEN
 C

@@ -1,24 +1,6 @@
       SUBROUTINE MB03UD( JOBQ, JOBP, N, A, LDA, Q, LDQ, SV, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute all, or part, of the singular value decomposition of a
@@ -100,6 +82,12 @@ C             The length of the array DWORK.
 C             LDWORK >= MAX(1,5*N).
 C             For optimum performance LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -124,7 +112,7 @@ C     March 1998. Based on the RASP routine DTRSVD.
 C
 C     REVISIONS
 C
-C     V. Sima, Feb. 2000.
+C     V. Sima, Feb. 2000, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -142,7 +130,7 @@ C     .. Scalar Arguments ..
 C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), DWORK(*), Q(LDQ,*), SV(*)
 C     .. Local Scalars ..
-      LOGICAL           WANTQ, WANTP
+      LOGICAL           LQUERY, WANTQ, WANTP
       INTEGER           I, IE, ISCL, ITAUP, ITAUQ, JWORK, MAXWRK,
      $                  MINWRK, NCOLP, NCOLQ
       DOUBLE PRECISION  ANRM, BIGNUM, EPS, SMLNUM
@@ -150,22 +138,20 @@ C     .. Local Arrays ..
       DOUBLE PRECISION  DUM(1)
 C     .. External Functions ..
       LOGICAL           LSAME
-      INTEGER           ILAENV
       DOUBLE PRECISION  DLAMCH, DLANTR
-      EXTERNAL          DLAMCH, DLANTR, ILAENV, LSAME
+      EXTERNAL          DLAMCH, DLANTR, LSAME
 C     .. External Subroutines ..
       EXTERNAL          DBDSQR, DGEBRD, DLACPY, DLASCL, DLASET, DORGBR,
      $                  XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         MAX, SQRT
+      INTRINSIC         INT, MAX, SQRT
 C     .. Executable Statements ..
 C
 C     Check the input scalar arguments.
 C
-      INFO = 0
+      INFO  = 0
       WANTQ = LSAME( JOBQ, 'V' )
       WANTP = LSAME( JOBP, 'V' )
-      MINWRK = 1
       IF( .NOT.WANTQ .AND. .NOT.LSAME( JOBQ, 'N' ) ) THEN
          INFO = -1
       ELSE IF( .NOT.WANTP .AND. .NOT.LSAME( JOBP, 'N' ) ) THEN
@@ -177,33 +163,42 @@ C
       ELSE IF( ( WANTQ .AND. LDQ.LT.MAX( 1, N ) ) .OR.
      $    ( .NOT.WANTQ .AND. LDQ.LT.1 ) ) THEN
          INFO = -7
+      ELSE
+C
+C        Compute workspace
+C        (Note: Comments in the code beginning "Workspace:" describe the
+C        minimal amount of workspace needed at that point in the code,
+C        as well as the preferred amount for good performance.
+C        NB refers to the optimal block size for the immediately
+C        following subroutine, as returned by ILAENV.)
+C
+         MINWRK = MAX( 1, 5*N )
+         LQUERY = LDWORK.EQ.-1
+         IF ( LQUERY ) THEN
+            CALL DGEBRD( N, N, A, LDA, SV, DWORK, DWORK, DWORK, DWORK,
+     $                   -1, INFO )
+            MAXWRK = INT( DWORK(1) )
+            IF( WANTQ ) THEN
+               CALL DORGBR( 'Q', N, N, N, Q, LDQ, DWORK, DWORK, -1,
+     $                      INFO )
+               MAXWRK = MAX( MAXWRK, INT( DWORK(1) ) )
+            END IF
+            IF( WANTP ) THEN
+               CALL DORGBR( 'P', N, N, N, A, LDA, DWORK, DWORK, -1,
+     $                      INFO )
+               MAXWRK = MAX( MAXWRK, INT( DWORK(1) ) )
+            END IF
+            MAXWRK = MAX( 3*N + MAXWRK, MINWRK )
+         END IF
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY )
+     $      INFO = -10
       END IF
 C
-C     Compute workspace
-C     (Note: Comments in the code beginning "Workspace:" describe the
-C     minimal amount of workspace needed at that point in the code,
-C     as well as the preferred amount for good performance.
-C     NB refers to the optimal block size for the immediately following
-C     subroutine, as returned by ILAENV.)
-C
-      IF( INFO.EQ.0 .AND. LDWORK.GE.1 .AND. N.GT.0 ) THEN
-         MAXWRK = 3*N+2*N*ILAENV( 1, 'DGEBRD', ' ', N, N, -1, -1 )
-         IF( WANTQ )
-     $      MAXWRK = MAX( MAXWRK, 3*N+N*
-     $                    ILAENV( 1, 'DORGBR', 'Q', N, N, N, -1 ) )
-         IF( WANTP )
-     $      MAXWRK = MAX( MAXWRK, 3*N+N*
-     $                    ILAENV( 1, 'DORGBR', 'P', N, N, N, -1 ) )
-         MINWRK = 5*N
-         MAXWRK = MAX( MAXWRK, MINWRK )
-         DWORK(1) = MAXWRK
-      END IF
-C
-      IF( LDWORK.LT.MINWRK ) THEN
-         INFO = -10
-      END IF
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'MB03UD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = MAXWRK
          RETURN
       END IF
 C
@@ -251,6 +246,7 @@ C     (Workspace: need 4*N, prefer 3*N+2*N*NB)
 C
       CALL DGEBRD( N, N, A, LDA, SV, DWORK(IE), DWORK(ITAUQ),
      $             DWORK(ITAUP), DWORK(JWORK), LDWORK-JWORK+1, INFO )
+      MAXWRK = MAX( MAXWRK, INT( DWORK(JWORK) ) + JWORK - 1 )
       IF( WANTQ ) THEN
 C
 C        Generate the transformation matrix Q corresponding to the
@@ -261,6 +257,7 @@ C
          CALL DLACPY( 'Lower', N, N, A, LDA, Q, LDQ )
          CALL DORGBR( 'Q', N, N, N, Q, LDQ, DWORK(ITAUQ), DWORK(JWORK),
      $                LDWORK-JWORK+1, INFO )
+         MAXWRK = MAX( MAXWRK, INT( DWORK(JWORK) ) + JWORK - 1 )
       ELSE
          NCOLQ = 0
       END IF
@@ -273,6 +270,7 @@ C
          NCOLP = N
          CALL DORGBR( 'P', N, N, N, A, LDA, DWORK(ITAUP), DWORK(JWORK),
      $                LDWORK-JWORK+1, INFO )
+         MAXWRK = MAX( MAXWRK, INT( DWORK(JWORK) ) + JWORK - 1 )
       ELSE
          NCOLP = 0
       END IF

@@ -1,36 +1,21 @@
       SUBROUTINE MB03AD( SHFT, K, N, AMAP, S, SINV, A, LDA1, LDA2, C1,
      $                   S1, C2, S2 )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
-C     To compute two Givens rotations (C1,S1) and (C2,S2)
-C     such that the orthogonal matrix
+C     To compute two Givens rotations (C1,S1) and (C2,S2) such that the
+C     orthogonal matrix
 C
-C                [  C1  S1  0 ]   [ 1  0   0  ]
-C           Q =  [ -S1  C1  0 ] * [ 0  C2  S2 ]
-C                [  0   0   1 ]   [ 0 -S2  C2 ]
+C               [ Q  0 ]        [  C1  S1  0 ]   [ 1  0   0  ]
+C           Z = [      ],  Q := [ -S1  C1  0 ] * [ 0  C2  S2 ],
+C               [ 0  I ]        [  0   0   1 ]   [ 0 -S2  C2 ]
 C
-C     makes the first column of the real Wilkinson single/double shift
-C     polynomial of the general product of matrices, stored in the
-C     array A, parallel to the first unit vector.
+C     makes the first column of the real Wilkinson double shift
+C     polynomial of the product of matrices in periodic upper Hessenberg
+C     form, stored in the array A, parallel to the first unit vector.
+C     Only the rotation defined by C1 and S1 is used for the real
+C     Wilkinson single shift polynomial (see SLICOT Library routine
+C     MB03BE).
 C
 C     ARGUMENTS
 C
@@ -39,7 +24,7 @@ C
 C     SHFT    CHARACTER*1
 C             Specifies the number of shifts employed by the shift
 C             polynomial, as follows:
-C             = 'D':  two real shifts;
+C             = 'D':  two shifts (assumes N > 2);
 C             = 'S':  one real shift.
 C
 C     Input/Output Parameters
@@ -48,23 +33,26 @@ C     K       (input)  INTEGER
 C             The number of factors.  K >= 1.
 C
 C     N       (input)  INTEGER
-C             The order of the factors in the array A.  N >= 3.
+C             The order of the factors in the array A.
+C             N >= 2, for a single shift polynomial;
+C             N >= 3, for a double shift polynomial.
 C
-C     AMAP    (input) INTEGER array, dimension (K)
+C     AMAP    (input)  INTEGER array, dimension (K)
 C             The map for accessing the factors, i.e., if AMAP(I) = J,
 C             then the factor A_I is stored at the J-th position in A.
+C             AMAP(1) is the pointer to the Hessenberg matrix.
 C
 C     S       (input)  INTEGER array, dimension (K)
 C             The signature array. Each entry of S must be 1 or -1.
 C
-C     SINV    (input) INTEGER
+C     SINV    (input)  INTEGER
 C             Signature multiplier. Entries of S are virtually
 C             multiplied by SINV.
 C
 C     A       (input)  DOUBLE PRECISION array, dimension (LDA1,LDA2,K)
-C             On entry, the leading N-by-N-by-K part of this array must
-C             contain a n-by-n product (implicitly represented by its K
-C             factors) in upper Hessenberg form.
+C             The leading N-by-N-by-K part of this array must contain
+C             the product (implicitly represented by its K factors)
+C             in periodic upper Hessenberg form.
 C
 C     LDA1    INTEGER
 C             The first leading dimension of the array A.  LDA1 >= N.
@@ -79,8 +67,9 @@ C             Givens rotation.
 C
 C     C2      (output)  DOUBLE PRECISION
 C     S2      (output)  DOUBLE PRECISION
-C             On exit, if SHFT = 'D', C2 and S2 contain the parameters
-C             for the second Givens rotation.
+C             On exit, if SHFT = 'D' and N > 2, C2 and S2 contain the
+C             parameters for the second Givens rotation. Otherwise,
+C             C2 = 1, S2 = 0.
 C
 C     METHOD
 C
@@ -94,6 +83,7 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Romania,
 C     July 2009, SLICOT Library version of the routine PLASHF.
+C     V. Sima, Apr. 2018, Oct. 2019, Dec. 2019.
 C
 C     KEYWORDS
 C
@@ -108,7 +98,7 @@ C     .. Parameters ..
 C     .. Scalar Arguments ..
       CHARACTER         SHFT
       INTEGER           K, LDA1, LDA2, N, SINV
-      DOUBLE PRECISION  C1, S1, C2, S2
+      DOUBLE PRECISION  C1, C2, S1, S2
 C     .. Array Arguments ..
       INTEGER           AMAP(*), S(*)
       DOUBLE PRECISION  A(LDA1,LDA2,*)
@@ -165,9 +155,13 @@ C
       ALPHA = ALPHA * C1 - A(N,N-1,AI) * S1
       CALL DLARTG( ALPHA, BETA, C1, S1, TEMP )
 C
-C     This is sufficient for single real shifts.
+C     This is sufficient for a single real shift.
 C
-      IF ( .NOT.SGLE ) THEN
+      IF ( SGLE ) THEN
+         C2 = ONE
+         S2 = ZERO
+C
+      ELSE
 C
          CALL DLARTG( TEMP, GAMMA, C2, S2, ALPHA )
 C

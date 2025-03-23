@@ -2,24 +2,6 @@
      $                   Q, LDQ, CSL, CSR, TAUL, TAUR, DWORK, LDWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a symplectic URV (SURV) decomposition of a real
@@ -146,7 +128,7 @@ C
 C     METHOD
 C
 C     The matrices U and V are represented as products of symplectic
-C     reflectors and Givens rotators
+C     reflectors and Givens rotations
 C
 C     U = diag( HU(1),HU(1) )  GU(1)  diag( FU(1),FU(1) )
 C         diag( HU(2),HU(2) )  GU(2)  diag( FU(2),FU(2) )
@@ -175,7 +157,7 @@ C     w(1:i-1) = 0 and w(i) = 1; w(i+1:n) is stored on exit in
 C     A(i+1:n,i), if op(A) = 'N', and in A(i,i+1:n), otherwise. The
 C     scalar nu is stored in TAUL(i).
 C
-C     Each GU(i) is a Givens rotator acting on rows i and n+i,
+C     Each GU(i) is a Givens rotation acting on rows i and n+i,
 C     where the cosine is stored in CSL(2*i-1) and the sine in
 C     CSL(2*i).
 C
@@ -196,7 +178,7 @@ C     w(1:i) = 0 and w(i+1) = 1; w(i+2:n) is stored on exit in
 C     B(i,i+2:n), if op(B) = 'N', and in B(i+2:n,i), otherwise.
 C     The scalar nu is stored in TAUR(i).
 C
-C     Each GV(i) is a Givens rotator acting on columns i+1 and n+i+1,
+C     Each GV(i) is a Givens rotation acting on columns i+1 and n+i+1,
 C     where the cosine is stored in CSR(2*i-1) and the sine in
 C     CSR(2*i).
 C
@@ -325,7 +307,7 @@ C
             Q(I,I) = ZERO
          END IF
 C
-C        Generate symplectic Givens rotator GU(i) to annihilate Q(i,i).
+C        Generate symplectic Givens rotation GU(i) to annihilate Q(i,i).
 C
          TEMP = A(I,I)
          CALL DLARTG( TEMP, ALPHA, C, S, A(I,I) )
@@ -435,7 +417,7 @@ C
          END IF
          IF ( I.LT.N ) THEN
 C
-C           Generate symplectic Givens rotator GV(i) to annihilate
+C           Generate symplectic Givens rotation GV(i) to annihilate
 C           Q(i,i+1).
 C
             IF ( LTRB ) THEN

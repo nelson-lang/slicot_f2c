@@ -1,22 +1,4 @@
-      SUBROUTINE SB03OV( A, B, C, S )
-C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
+      SUBROUTINE SB03OV( A, B, SMALL, C, S )
 C
 C     PURPOSE
 C
@@ -49,6 +31,11 @@ C
 C     B       (input) DOUBLE PRECISION
 C             The real number b.
 C
+C     SMALL   (input) DOUBLE PRECISION
+C             A small real number. If the norm d of [ a; b ] is smaller
+C             than SMALL, then the rotation is taken as a unit matrix,
+C             and A(1) and A(2) are set to d and 0, respectively.
+C
 C     C       (output) DOUBLE PRECISION array, dimension (2)
 C             C(1) and C(2) contain the real and imaginary part,
 C             respectively, of the complex number c, the cosines of
@@ -65,7 +52,7 @@ C     NAG Ltd., United Kingdom, May 1985.
 C
 C     REVISIONS
 C
-C     Dec. 1997.
+C     Dec. 1997, Aug. 2012.
 C
 C     KEYWORDS
 C
@@ -77,7 +64,7 @@ C     .. Parameters ..
       DOUBLE PRECISION  ONE, ZERO
       PARAMETER         ( ONE = 1.0D0, ZERO = 0.0D0 )
 C     .. Scalar Arguments ..
-      DOUBLE PRECISION  B, S
+      DOUBLE PRECISION  B, S, SMALL
 C     .. Array Arguments ..
       DOUBLE PRECISION  A(2), C(2)
 C     .. Local Scalars ..
@@ -88,10 +75,14 @@ C     .. External Functions ..
 C     .. Executable Statements ..
 C
       D = DLAPY3( A(1), A(2), B )
-      IF ( D.EQ.ZERO ) THEN
+      IF ( D.LT.SMALL ) THEN
          C(1) = ONE
          C(2) = ZERO
          S = ZERO
+         IF ( D.GT.ZERO ) THEN
+            A(1) = D
+            A(2) = ZERO
+         END IF
       ELSE
          C(1) = A(1)/D
          C(2) = A(2)/D

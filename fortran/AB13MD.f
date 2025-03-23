@@ -1,24 +1,6 @@
       SUBROUTINE AB13MD( FACT, N, Z, LDZ, M, NBLOCK, ITYPE, X, BOUND, D,
      $                   G, IWORK, DWORK, LDWORK, ZWORK, LZWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute an upper bound on the structured singular value for a
@@ -89,7 +71,7 @@ C             is negative semidefinite.
 C
 C     Workspace
 C
-C     IWORK   INTEGER array, dimension MAX(4*M-2,N)
+C     IWORK   INTEGER array, dimension (MAX(4*M-2,N))
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if INFO = 0, DWORK(1) contains the optimal value
@@ -153,6 +135,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Katholieke Universiteit Leuven, February 2001.
+C     V. Sima, May 2022.
 C
 C     KEYWORDS
 C
@@ -223,8 +206,8 @@ C     .. External Subroutines ..
      $                   ZLASCL
 C     ..
 C     .. Intrinsic Functions ..
-      INTRINSIC          ABS, DCMPLX, DCONJG, DFLOAT, DREAL, INT, LOG,
-     $                   MAX, SQRT
+      INTRINSIC          ABS, DBLE, DCMPLX, DCONJG, DIMAG, DREAL, INT,
+     $                   LOG, MAX, SQRT
 C     ..
 C     .. Executable Statements ..
 C
@@ -310,7 +293,11 @@ C
 C
 C           1-by-1 real block.
 C
-            BOUND = ZERO
+            IF( DIMAG( Z( 1, 1 ) ).NE.ZERO ) THEN
+               BOUND = ZERO
+            ELSE
+               BOUND = ABS( DBLE( Z( 1, 1 ) ) )
+            END IF
             DWORK( 1 ) = ONE
             ZWORK( 1 ) = CONE
          ELSE
@@ -845,7 +832,7 @@ C
                END IF
   540       CONTINUE
             CALL DSCAL( N, ZNORM, G, 1 )
-            DWORK( 1 ) = DFLOAT( MINWRK - 5*N + LWAMAX )
+            DWORK( 1 ) = DBLE(   MINWRK - 5*N + LWAMAX )
             ZWORK( 1 ) = DCMPLX( MINZRK - 3*N + LZAMAX )
             RETURN
          END IF

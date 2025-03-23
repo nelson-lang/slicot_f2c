@@ -1,36 +1,18 @@
       SUBROUTINE MB03HD( N, A, LDA, B, LDB, MACPAR, Q, LDQ, DWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To determine an orthogonal matrix Q, for a real regular 2-by-2 or
 C     4-by-4 skew-Hamiltonian/Hamiltonian pencil
 C
 C                     ( A11 A12  )     ( B11  B12  )
-C         aA - bB = a (        T ) - b (         T )
-C                     (  0  A11  )     (  0  -B11  )
+C         aA - bB = a (          ) - b (           )
+C                     (  0  A11' )     (  0  -B11' )
 C
-C                                             T  T
-C     in structured Schur form, such that  J Q  J  (aA - bB) Q  is still
-C     in structured Schur form but the eigenvalues are exchanged.
+C     in structured Schur form, such that  J Q' J' (aA - bB) Q  is still
+C     in structured Schur form but the eigenvalues are exchanged. The
+C     notation M' denotes the transpose of the matrix M.
 C
 C     ARGUMENTS
 C
@@ -82,7 +64,8 @@ C
 C     INFO    INTEGER
 C             = 0: succesful exit;
 C             = 1: the leading N/2-by-N/2 block of the matrix B is
-C                  numerically singular.
+C                  numerically singular, but slightly perturbed values
+C                  have been used. This is a warning.
 C
 C     METHOD
 C
@@ -114,7 +97,8 @@ C     V. Sima, Sep. 2009 (SLICOT version of the routine DHAUEX).
 C
 C     REVISIONS
 C
-C     V. Sima, Nov. 2009, Nov. 2010.
+C     V. Sima, Nov. 2009, Nov. 2010, Apr. 2016.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C
@@ -192,8 +176,6 @@ C
      $               MAX( ABS( DWORK( 17 ) ), ABS( DWORK( 22 ) ) ) )
          PAR( 3 ) = SMIN
          CALL MB02UW( .FALSE., 2, 6, PAR, B, LDB, DWORK, 4, SI, INFO )
-         IF( INFO.NE.0 )
-     $      RETURN
 C
 C        Compute X22 = -d*inv(B11')*A11'.
 C

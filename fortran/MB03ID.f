@@ -2,24 +2,6 @@
      $                   LDB, F, LDF, Q, LDQ, U1, LDU1, U2, LDU2, NEIG,
      $                   IWORK, LIWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To move the eigenvalues with strictly negative real parts of an
@@ -44,7 +26,8 @@ C                            (  Bout  Fout  )
 C       Hout = J Q' J' H Q = (              ),
 C                            (    0  -Bout' )
 C
-C     where Aout, Bout and Cout remain in triangular form.
+C     where Aout, Bout and Cout remain in triangular form. The notation
+C     M' denotes the transpose of the matrix M.
 C     Optionally, if COMPQ = 'I' or COMPQ = 'U', the orthogonal matrix Q
 C     that fulfills (1) is computed.
 C     Optionally, if COMPU = 'I' or COMPU = 'U', the orthogonal
@@ -158,14 +141,14 @@ C             On entry, if COMPQ = 'U', then the leading N-by-N part of
 C             this array must contain a given matrix Q0, and on exit,
 C             the leading N-by-N part of this array contains the product
 C             of the input matrix Q0 and the transformation matrix Q
-C             used to transform the matrices S and H.
+C             used to transform the matrices Z and H.
 C             On exit, if COMPQ = 'I', then the leading N-by-N part of
 C             this array contains the orthogonal transformation matrix
 C             Q.
 C             If COMPQ = 'N' this array is not referenced.
 C
 C     LDQ     INTEGER
-C             The leading dimension of of the array Q.
+C             The leading dimension of the array Q.
 C             LDQ >= 1,         if COMPQ = 'N';
 C             LDQ >= MAX(1, N), if COMPQ = 'I' or COMPQ = 'U'.
 C
@@ -176,7 +159,7 @@ C             of this array must contain the upper left block of a
 C             given matrix U0, and on exit, the leading N/2-by-N/2 part
 C             of this array contains the updated upper left block U1 of
 C             the product of the input matrix U0 and the transformation
-C             matrix U used to transform the matrices S and H.
+C             matrix U used to transform the matrices Z and H.
 C             On exit, if COMPU = 'I', then the leading N/2-by-N/2 part
 C             of this array contains the upper left block U1 of the
 C             orthogonal symplectic transformation matrix U.
@@ -194,7 +177,7 @@ C             of this array must contain the upper right block of a
 C             given matrix U0, and on exit, the leading N/2-by-N/2 part
 C             of this array contains the updated upper right block U2 of
 C             the product of the input matrix U0 and the transformation
-C             matrix U used to transform the matrices S and H.
+C             matrix U used to transform the matrices Z and H.
 C             On exit, if COMPU = 'I', then the leading N/2-by-N/2 part
 C             of this array contains the upper right block U2 of the
 C             orthogonal symplectic transformation matrix U.
@@ -203,7 +186,7 @@ C
 C     LDU2    INTEGER
 C             The leading dimension of the array U2.
 C             LDU2 >= 1,           if COMPU = 'N';
-C             LDU2 >= MAX(1, N/2), if COMPU = 'U' or COMPU = 'I'.
+C             LDU2 >= MAX(1, N/2), if COMPU = 'I' or COMPU = 'U'.
 C
 C     NEIG    (output) INTEGER
 C             The number of eigenvalues in aS - bH with strictly
@@ -240,7 +223,7 @@ C     METHOD
 C
 C     The algorithm reorders the eigenvalues like the following scheme:
 C
-C     Step 1: Reorder the eigenvalues in the subpencil aA - bB.
+C     Step 1: Reorder the eigenvalues in the subpencil aC'*A - bB.
 C          I. Reorder the eigenvalues with negative real parts to the
 C             top.
 C         II. Reorder the eigenvalues with positive real parts to the
@@ -249,12 +232,12 @@ C
 C     Step 2: Reorder the remaining eigenvalues with negative real
 C             parts in the pencil aS - bH.
 C          I. Exchange the eigenvalues between the last diagonal block
-C             in aA - bB and the last diagonal block in aS - bH.
+C             in aC'*A - bB and the last diagonal block in aS - bH.
 C         II. Move the eigenvalues of the R-th block to the (MM+1)-th
 C             block, where R denotes the number of upper quasi-
-C             triangular blocks in aA - bB and MM denotes the current
-C             number of blocks in aA - bB with eigenvalues with negative
-C             real parts.
+C             triangular blocks in aC'*A - bB and MM denotes the current
+C             number of blocks in aC'*A - bB with eigenvalues with
+C             negative real parts.
 C
 C     The algorithm uses a sequence of orthogonal transformations as
 C     described on page 25 in [1]. To achieve those transformations the
@@ -282,7 +265,9 @@ C     V. Sima, Dec. 2009 (SLICOT version of the routine DHAFNX).
 C
 C     REVISIONS
 C
-C     V. Sima, Aug. 2009; Feb. 2010; Oct. 2010; Nov. 2010.
+C     V. Sima, Aug. 2009; Feb. 2010; Oct. 2010; Nov. 2010; Feb. 2011,
+C     Sep. 2011.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C
@@ -316,8 +301,8 @@ C     .. Local Scalars ..
      $                   IWRK4, IWRK5, IZLORI, IZUPLE, IZUPRI, J, K,
      $                   LDW, M, MM, MP, NCOL, NCOLS, NROW, NROWS,
      $                   OPTDW, R, SDIM, UPDS
-      DOUBLE PRECISION   A2, BASE, C2, F2, LGBAS, NRMB, PREC, Q11, Q12,
-     $                   Q21, Q22, TMPA, TMPC, TOL, U11, U12
+      DOUBLE PRECISION   A2, BASE, C2, DN, F2, LGBAS, NRMB, PREC, Q11,
+     $                   Q12, Q21, Q22, TMPA, TMPC, TOL, U11, U12
 C
 C     .. Local Arrays ..
       INTEGER            IDUM( 8 )
@@ -402,6 +387,7 @@ C
       PREC  = DLAMCH( 'Precision' )
       BASE  = DLAMCH( 'Base' )
       LGBAS = LOG( BASE )
+      DN    = DBLE( N )*PREC
       TOL   = MIN( DBLE( M ), TEN )*PREC
 C
       PAR( 1 ) = PREC
@@ -410,7 +396,7 @@ C
 C     STEP 0: Determine location and size of diagonal blocks.
 C             IWORK(J) and IWORK(IS+J) are used to indicate the
 C             beginning index and the kind of eigenvalues of the
-C             J-th diagonal block of the subpencil aA - bB.
+C             J-th diagonal block of the subpencil aC'*A - bB.
 C             To find IWORK(IS+J) for the block J of size dim, compute
 C                                      -T                      -1
 C                sign( trace(C(rng,rng)  *B(rng,rng)*A(rng,rng)  ) ),
@@ -469,9 +455,11 @@ C
                CALL MB03BB( BASE, LGBAS, PREC, 3, IDUM, IDUM( 4 ), 1,
      $                      PRD, 2, 2, DWORK, DWORK( 3 ), DWORK( 5 ),
      $                      IDUM( 7 ), DWORK( 7 ), INFO )
-               IF( INFO.NE.0 )
+               IF( INFO.EQ.1 )
      $            RETURN
-               IF( DWORK( 5 ).EQ.ZERO .OR. DWORK( 6 ).EQ.ZERO ) THEN
+               IF( DWORK( 5 ).EQ.ZERO .OR. DWORK( 6 ).EQ.ZERO .OR.
+     $               ABS( DWORK( 1 ) ).LE.DN* ABS( DWORK( 3 ) ) )
+     $               THEN
                   IWORK( IS+J ) = 0
                ELSE
                   IWORK( IS+J ) = MA01CD( DWORK( 1 ), IDUM( 7 ),
@@ -539,7 +527,7 @@ C
          F2 = F( M, M-1 )
       END IF
 C
-C     STEP 1: Reorder the eigenvalues in the subpencil aA - bB.
+C     STEP 1: Reorder the eigenvalues in the subpencil aC'*A - bB.
 C
       MM = 0
       MP = J

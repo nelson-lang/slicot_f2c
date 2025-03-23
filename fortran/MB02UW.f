@@ -1,24 +1,6 @@
       SUBROUTINE MB02UW( LTRANS, N, M, PAR, A, LDA, B, LDB, SCALE,
      $                   IWARN )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve a system of the form  A X = s B  or  A' X = s B  with
@@ -114,7 +96,7 @@ C     Based on the LAPACK Library routine DLALN2.
 C
 C     REVISIONS
 C
-C     V. Sima, Nov. 2010.
+C     V. Sima, Nov. 2010, Apr. 2016.
 C
 C     KEYWORDS
 C
@@ -174,6 +156,7 @@ C
       EPS    = PAR( 1 )
       SMLNUM = TWO*PAR( 2 ) / EPS
       BIGNUM = ONE / SMLNUM
+      SMINI  = MAX( SMIN, SMLNUM )
 C
 C     Standard initializations.
 C
@@ -185,7 +168,6 @@ C        1-by-1  (i.e., scalar) systems  C X = B.
 C
          CS    = A( 1, 1 )
          CMAX  = ABS( CS )
-         SMINI = MAX( SMIN, SMLNUM, EPS*CMAX )
 C
 C        If | C | < SMINI, use C = SMINI.
 C
@@ -225,8 +207,6 @@ C
             C( 1, 2 ) = A( 1, 2 )
          END IF
 C
-         BNORM = DLANGE( 'M', N, M, B, LDB, CV )
-C
 C        Find the largest element in C.
 C
          CMAX  = ZERO
@@ -239,11 +219,10 @@ C
             END IF
    20    CONTINUE
 C
-         SMINI = MAX( SMIN, SMLNUM, EPS*CMAX )
-C
 C        If norm(C) < SMINI, use SMINI*identity.
 C
          IF( CMAX.LT.SMINI ) THEN
+            BNORM = DLANGE( 'M', N, M, B, LDB, CV )
             IF( SMINI.LT.ONE .AND. BNORM.GT.ONE ) THEN
                IF( BNORM.GT.BIGNUM*SMINI )
      $            SCALE = ONE / BNORM

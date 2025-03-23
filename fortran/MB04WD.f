@@ -1,29 +1,11 @@
       SUBROUTINE MB04WD( TRANQ1, TRANQ2, M, N, K, Q1, LDQ1, Q2, LDQ2,
      $                   CS, TAU, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To generate a matrix Q with orthogonal columns (spanning an
 C     isotropic subspace), which is defined as the first n columns
-C     of a product of symplectic reflectors and Givens rotators,
+C     of a product of symplectic reflectors and Givens rotations,
 C
 C         Q = diag( H(1),H(1) ) G(1) diag( F(1),F(1) )
 C             diag( H(2),H(2) ) G(2) diag( F(2),F(2) )
@@ -64,7 +46,7 @@ C             The number of columns of the matrices Q1 and Q2.
 C             M >= N >= 0.
 C
 C     K       (input) INTEGER
-C             The number of symplectic Givens rotators whose product
+C             The number of symplectic Givens rotations whose product
 C             partly defines the matrix Q. N >= K >= 0.
 C
 C     Q1      (input/output) DOUBLE PRECISION array, dimension
@@ -110,7 +92,7 @@ C
 C     CS      (input) DOUBLE PRECISION array, dimension (2*K)
 C             On entry, the first 2*K elements of this array must
 C             contain the cosines and sines of the symplectic Givens
-C             rotators G(i).
+C             rotations G(i).
 C
 C     TAU     (input) DOUBLE PRECISION array, dimension (K)
 C             On entry, the first K elements of this array must
@@ -128,6 +110,12 @@ C             value of LDWORK.
 C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.  LDWORK >= MAX(1,M+N).
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -150,6 +138,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DOSGSB).
+C     V. Sima, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -166,15 +155,15 @@ C     .. Scalar Arguments ..
 C     .. Array Arguments ..
       DOUBLE PRECISION  CS(*), DWORK(*), Q1(LDQ1,*), Q2(LDQ2,*), TAU(*)
 C     .. Local Scalars ..
-      LOGICAL           LTRQ1, LTRQ2
-      INTEGER           I, IB, IERR, KI, KK, NB, NBMIN, NX, PDRS, PDT,
-     $                  PDW, WRKOPT
+      LOGICAL           LQUERY, LTRQ1, LTRQ2
+      INTEGER           I, IB, IERR, KI, KK, MINWRK, NB, NBMIN, NX,
+     $                  PDRS, PDT, PDW, WRKOPT
 C     .. External Functions ..
       LOGICAL           LSAME
       INTEGER           UE01MD
       EXTERNAL          LSAME, UE01MD
 C     .. External Subroutines ..
-      EXTERNAL          MB04QC, MB04QF, MB04WU, XERBLA
+      EXTERNAL          DORGQR, MB04QC, MB04QF, MB04WU, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC         DBLE, INT, MAX, MIN, SQRT
 C
@@ -185,7 +174,6 @@ C
       INFO  = 0
       LTRQ1 = LSAME( TRANQ1, 'T' ) .OR. LSAME( TRANQ1,'C' )
       LTRQ2 = LSAME( TRANQ2, 'T' ) .OR. LSAME( TRANQ2,'C' )
-      NB = UE01MD( 1, 'MB04WD', TRANQ1 // TRANQ2, M, N, K )
 C
 C     Check the scalar input parameters.
 C
@@ -205,9 +193,26 @@ C
       ELSE IF ( ( LTRQ2 .AND. LDQ2.LT.MAX( 1, N ) ) .OR.
      $     ( .NOT.LTRQ2 .AND. LDQ2.LT.MAX( 1, M ) ) ) THEN
          INFO = -9
-      ELSE IF ( LDWORK.LT.MAX( 1, M + N ) ) THEN
-         DWORK(1) = DBLE( MAX( 1, M + N ) )
-         INFO = -13
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         MINWRK = MAX( 1, M + N )
+         IF ( LDWORK.LT.MINWRK .AND. .NOT.LQUERY ) THEN
+            DWORK(1) = DBLE( MINWRK )
+            INFO = -13
+         ELSE
+            IF ( MIN( M, N ).EQ.0 ) THEN
+               WRKOPT = ONE
+            ELSE
+               CALL DORGQR( M, N, K, DWORK, M, DWORK, DWORK, -1, INFO )
+               WRKOPT = MAX( MINWRK, INT( DWORK(1) ) ) 
+               NB     = INT( WRKOPT/N )
+               WRKOPT = MAX( WRKOPT, 8*N*NB + 15*NB*NB )
+            END IF
+            IF ( LQUERY ) THEN
+               DWORK(1) = DBLE( WRKOPT )
+               RETURN
+            END IF
+         END IF
       END IF
 C
 C     Return if there were illegal values.
@@ -226,7 +231,6 @@ C
 C
       NBMIN = 2
       NX = 0
-      WRKOPT = M + N
       IF( NB.GT.1 .AND. NB.LT.K ) THEN
 C
 C        Determine when to cross over from blocked to unblocked code.
@@ -236,7 +240,6 @@ C
 C
 C           Determine if workspace is large enough for blocked code.
 C
-            WRKOPT = MAX( WRKOPT, 8*N*NB + 15*NB*NB )
             IF( LDWORK.LT.WRKOPT ) THEN
 C
 C              Not enough workspace to use optimal NB:  reduce NB and

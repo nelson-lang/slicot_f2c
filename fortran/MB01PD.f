@@ -1,24 +1,6 @@
       SUBROUTINE MB01PD( SCUN, TYPE, M, N, KL, KU, ANRM, NBL, NROWS, A,
      $                   LDA, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To scale a matrix or undo scaling.  Scaling is performed, if
@@ -119,7 +101,7 @@ C     V. Sima, Katholieke Univ. Leuven, Belgium, Nov. 1996.
 C
 C     REVISIONS
 C
-C     Oct. 2001, V. Sima, Research Institute for Informatics, Bucharest.
+C     V. Sima, Oct. 2001, June 2022.
 C
 C    ******************************************************************
 C
@@ -134,7 +116,7 @@ C     .. Array Arguments ..
       INTEGER            NROWS ( * )
       DOUBLE PRECISION   A( LDA, * )
 C     .. Local Scalars ..
-      LOGICAL            FIRST, LSCALE
+      LOGICAL            LSCALE
       INTEGER            I, ISUM, ITYPE
       DOUBLE PRECISION   BIGNUM, SMLNUM
 C     .. External Functions ..
@@ -146,10 +128,6 @@ C     .. External Subroutines ..
       EXTERNAL           DLABAD, MB01QD, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC          MAX, MIN
-C     .. Save statement ..
-      SAVE               BIGNUM, FIRST, SMLNUM
-C     .. Data statements ..
-      DATA               FIRST/.TRUE./
 C     ..
 C     .. Executable Statements ..
 C
@@ -225,15 +203,11 @@ C
       IF( MN.EQ.0 .OR. ANRM.EQ.ZERO )
      $   RETURN
 C
-      IF ( FIRST ) THEN
+C     Get machine parameters.
 C
-C        Get machine parameters.
-C
-         SMLNUM = DLAMCH( 'S' ) / DLAMCH( 'P' )
-         BIGNUM = ONE / SMLNUM
-         CALL DLABAD( SMLNUM, BIGNUM )
-         FIRST = .FALSE.
-      END IF
+      SMLNUM = DLAMCH( 'S' ) / DLAMCH( 'P' )
+      BIGNUM = ONE / SMLNUM
+      CALL DLABAD( SMLNUM, BIGNUM )
 C
       IF ( LSCALE ) THEN
 C

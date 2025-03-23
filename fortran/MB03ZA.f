@@ -3,24 +3,6 @@
      $                   LDV1, V2, LDV2, W, LDW, WR, WI, M, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     1. To compute, for a given matrix pair (A,B) in periodic Schur
@@ -201,9 +183,9 @@ C
 C     WR      (output) DOUBLE PRECISION array, dimension (M)
 C     WI      (output) DOUBLE PRECISION array, dimension (M)
 C             The real and imaginary parts, respectively, of the
-C             eigenvalues of R22. The eigenvalues are stored in the same
+C             eigenvalues of R11. The eigenvalues are stored in the same
 C             order as on the diagonal of R22, with
-C             WR(i) = R22(i,i) and, if R22(i:i+1,i:i+1) is a 2-by-2
+C             WR(i) = -R22(i,i) and, if R22(i:i+1,i:i+1) is a 2-by-2
 C             diagonal block, WI(i) > 0 and WI(i+1) = -WI(i).
 C             In exact arithmetic, these eigenvalue are the positive
 C             square roots of the selected eigenvalues of the product
@@ -273,6 +255,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DLABMX).
+C     V. Sima, June 2015.
 C
 C     KEYWORDS
 C

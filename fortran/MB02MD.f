@@ -1,24 +1,6 @@
       SUBROUTINE MB02MD( JOB, M, N, L, RANK, C, LDC, S, X, LDX, TOL,
      $                   IWORK, DWORK, LDWORK, IWARN, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve the Total Least Squares (TLS) problem using a Singular
@@ -144,6 +126,12 @@ C             LDWORK = max(2, 3*(N+L) + M, 5*(N+L)),       if M >= N+L;
 C             LDWORK = max(2, M*(N+L) + max( 3M+N+L, 5*M), 3*L),
 C                                                          if M <  N+L.
 C             For optimum performance LDWORK should be larger.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Warning Indicator
 C
@@ -296,7 +284,8 @@ C     University, Leuven, Belgium.
 C
 C     REVISIONS
 C
-C     June 24, 1997, Feb. 27, 2000, Oct. 19, 2003, Feb. 21, 2004.
+C     June 24, 1997, Feb. 27, 2000, Oct. 19, 2003, Feb. 21, 2004,
+C     June 13, 2012.
 C
 C     KEYWORDS
 C
@@ -316,9 +305,9 @@ C     .. Array Arguments ..
       INTEGER           IWORK(*)
       DOUBLE PRECISION  C(LDC,*), DWORK(*), S(*), X(LDX,*)
 C     .. Local Scalars ..
-      LOGICAL           CRANK, CTOL, LJOBN, LJOBR, LJOBT
-      INTEGER           ITAU, J, JWORK, LDW, K, MINMNL, N1, NL, P, R1,
-     $                  WRKOPT
+      LOGICAL           CRANK, CTOL, LJOBN, LJOBR, LJOBT, LQUERY
+      INTEGER           ITAU, J, JWORK, LDW, K, MINMNL, MINWRK, N1, NL,
+     $                  P, R1, WRKOPT
       DOUBLE PRECISION  FNORM, RCOND, SMAX, TOLTMP
 C     .. External Functions ..
       LOGICAL           LSAME
@@ -365,10 +354,35 @@ C
          INFO = -10
       ELSE IF( CTOL .AND. TOL.LT.ZERO ) THEN
          INFO = -11
-      ELSE IF( ( M.GE.NL .AND. LDWORK.LT.MAX( 2, LDW ) ).OR.
-     $         ( M.LT.NL .AND. LDWORK.LT.MAX( 2, M*NL + LDW, 3*L ) ) )
-     $       THEN
-         INFO = -14
+      ELSE
+         IF( M.GE.NL ) THEN
+            MINWRK = MAX( 2, LDW )
+         ELSE
+            MINWRK = MAX( 2, M*NL + LDW, 3*L )
+         END IF
+         WRKOPT = MINWRK
+         LQUERY = LDWORK.EQ.-1
+         IF( LQUERY ) THEN
+            IF ( M.GE.NL ) THEN
+               CALL DGESVD( 'N', 'O', M, NL, C, LDC, S, DWORK, 1, DWORK,
+     $                      1, DWORK, -1, INFO )
+               WRKOPT = MAX( MINWRK, INT( DWORK(1) ) )
+            ELSE
+               CALL DGESVD( 'N', 'A', M, NL, DWORK, M, S, DWORK, 1, C,
+     $                      LDC, DWORK, -1, INFO )
+               WRKOPT = MAX( MINWRK, INT( DWORK(1) ) + M*NL )
+            END IF
+C
+            IF ( L.GT.0 ) THEN
+               CALL DGERQF( L, NL-1, C, LDC, DWORK, DWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + L )
+               CALL DORMRQ( 'R', 'T', N, NL-1, L, C, LDC, DWORK, C, LDC,
+     $                      DWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + L )
+            END IF
+         END IF
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY )
+     $       INFO = -14
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -376,6 +390,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'MB02MD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C

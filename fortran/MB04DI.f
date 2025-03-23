@@ -1,24 +1,6 @@
       SUBROUTINE MB04DI( JOB, SGN, N, ILO, SCALE, M, V1, LDV1, V2, LDV2,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To apply the inverse of a balancing transformation, computed by
@@ -96,7 +78,7 @@ C     REFERENCES
 C
 C     [1] Benner, P.
 C         Symplectic balancing of Hamiltonian matrices.
-C         SIAM J. Sci. Comput., 22 (5), pp. 1885-1904, 2000.
+C         SIAM J. Sci. Comput., 22 (5), pp. 1885-1904, 2001.
 C
 C     CONTRIBUTORS
 C
@@ -106,6 +88,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DHABAK).
+C     V. Sima, April 2015.
 C
 C     KEYWORDS
 C
@@ -173,7 +156,7 @@ C     Inverse scaling.
 C
       IF ( LSCAL ) THEN
          DO 20 I = ILO, N
-            CALL DRSCL( M, SCALE(I), V1(I,1), LDV1 )
+            CALL DSCAL( M, SCALE(I), V1(I,1), LDV1 )
    20    CONTINUE
          DO 30 I = ILO, N
             CALL DRSCL( M, SCALE(I), V2(I,1), LDV2 )
@@ -203,9 +186,9 @@ C              Exchange V1(k,:) <-> V2(k,:).
 C
                CALL DSWAP( M, V1(K,1), LDV1, V2(K,1), LDV2 )
                IF ( LSGN ) THEN
-                  CALL DSCAL( M, -ONE, V2(K,1), LDV2 )
-               ELSE
                   CALL DSCAL( M, -ONE, V1(K,1), LDV1 )
+               ELSE
+                  CALL DSCAL( M, -ONE, V2(K,1), LDV2 )
                END IF
             END IF
    40    CONTINUE

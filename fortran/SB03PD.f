@@ -2,24 +2,6 @@
      $                   SCALE, SEPD, FERR, WR, WI, IWORK, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve the real discrete Lyapunov matrix equation
@@ -217,7 +199,7 @@ C     1993.
 C
 C     REVISIONS
 C
-C     V. Sima, Katholieke Univ. Leuven, Belgium, May 1999.
+C     V. Sima, Katholieke Univ. Leuven, Belgium, May 1999, May 2020.
 C
 C     KEYWORDS
 C
@@ -248,6 +230,7 @@ C     .. Local Scalars ..
 C     ..
 C     .. Local Arrays ..
       LOGICAL            BWORK( 1 )
+      INTEGER            ISAVE( 3 )
 C     ..
 C     .. External Functions ..
       LOGICAL            LSAME, SELECT
@@ -255,7 +238,7 @@ C     .. External Functions ..
       EXTERNAL           DLAMCH, DLANHS, LSAME, SELECT
 C     ..
 C     .. External Subroutines ..
-      EXTERNAL           DCOPY, DGEES, DLACON, MB01RD, SB03MX, XERBLA
+      EXTERNAL           DCOPY, DGEES, DLACN2, MB01RD, SB03MX, XERBLA
 C     ..
 C     .. Intrinsic Functions ..
       INTRINSIC          DBLE, INT, MAX
@@ -379,7 +362,8 @@ C
          KASE = 0
 C        REPEAT
    30    CONTINUE
-         CALL DLACON( N*N, DWORK( N*N+1 ), DWORK, IWORK, EST, KASE )
+         CALL DLACN2( N*N, DWORK( N*N+1 ), DWORK, IWORK, EST, KASE,
+     $                ISAVE )
          IF( KASE.NE.0 ) THEN
             IF( KASE.EQ.1 ) THEN
                CALL SB03MX( TRANA, N, A, LDA, DWORK, N, SCALEF,

@@ -1,24 +1,6 @@
       SUBROUTINE MB03BB( BASE, LGBAS, ULP, K, AMAP, S, SINV, A, LDA1,
      $                   LDA2, ALPHAR, ALPHAI, BETA, SCAL, DWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the eigenvalues of a general 2-by-2 matrix product via
@@ -63,23 +45,23 @@ C     LDA2    INTEGER
 C             The second leading dimension of the array A.  LDA2 >= 2.
 C
 C     ALPHAR  (output)  DOUBLE PRECISION array, dimension (2)
-C             On exit, if INFO = 0, this array contains the scaled real
-C             part of the two eigenvalues. If BETA(I) <> 0, then the
-C             I-th eigenvalue (I = 1 : 2) is given by
+C             On exit, this array contains the scaled real part of the
+C             two eigenvalues. If BETA(I) <> 0, then the I-th eigenvalue
+C             (I = 1 : 2) is given by
 C                 (ALPHAR(I) + ALPHAI(I)*SQRT(-1) ) * (BASE)**SCAL(I).
 C
 C     ALPHAI  (output)  DOUBLE PRECISION array, dimension (2)
-C             On exit, if INFO = 0, this array contains the scaled
-C             imaginary part of the two eigenvalues. ALPHAI(1) >= 0.
+C             On exit, this array contains the scaled imaginary part of
+C             the two eigenvalues. ALPHAI(1) >= 0.
 C
 C     BETA    (output)  DOUBLE PRECISION array, dimension (2)
-C             On exit, if INFO = 0, this array contains information
-C             about infinite eigenvalues. If BETA(I) = 0, then the
-C             I-th eigenvalue is infinite. Otherwise, BETA(I) = 1.0.
+C             On exit, this array contains information about infinite
+C             eigenvalues. If BETA(I) = 0, then the I-th eigenvalue is
+C             infinite. Otherwise, BETA(I) = 1.0.
 C
 C     SCAL    (output)  INTEGER array, dimension (2)
-C             On exit, if INFO = 0, this array contains the scaling
-C             exponents for the two eigenvalues.
+C             On exit, this array contains the scaling exponents for the
+C             two eigenvalues.
 C
 C     Workspace
 C
@@ -89,7 +71,10 @@ C     Error Indicator
 C
 C     INFO    INTEGER
 C             = 0:  successful exit;
-C             = 1:  the periodic QZ algorithm did not converge.
+C             = 1:  the periodic QZ algorithm did not converge;
+C             = 2:  the computed eigenvalues might be inaccurate.
+C                   Both values might be taken as warnings, since
+C                   approximations of eigenvalues are returned.
 C
 C     METHOD
 C
@@ -103,7 +88,7 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Romania,
 C     July 2009, SLICOT Library version of the routine PLACP2.
-C     V. Sima, June 2010, July 2010.
+C     V. Sima, June 2010, July 2010, Aug. 2011, Sep. 2011, Oct. 2011.
 C
 C     KEYWORDS
 C
@@ -127,7 +112,7 @@ C     .. Array Arguments ..
       INTEGER           AMAP(*), S(*), SCAL(2)
 C     .. Local Scalars ..
       INTEGER           AI, I, IITER, J, PDM, PDW, SL
-      DOUBLE PRECISION  CS, CST, LHS, RHS, TEMPI, TEMPR
+      DOUBLE PRECISION  CS, CST, LHS, MISC, MISR, RHS, TEMPI, TEMPR
       COMPLEX*16        SN, SNT, TEMP
 C     .. Local Arrays ..
       COMPLEX*16        T(2,2), Z(3,3)
@@ -137,15 +122,16 @@ C     .. External Functions ..
 C     .. External Subroutines ..
       EXTERNAL          DLADIV, ZLARTG, ZROT
 C     .. Intrinsic Functions ..
-      INTRINSIC         DCMPLX, DCONJG, DBLE, DIMAG, DREAL, INT, LOG,
-     $                  MAX, MOD
+      INTRINSIC         ABS, DCMPLX, DCONJG, DBLE, DIMAG, DREAL, INT,
+     $                  LOG, MAX, MIN, MOD, SQRT
 C
 C     .. Executable Statements ..
 C
 C     Apply a complex single shifted periodic QZ iteration.
 C     This might not be efficient but it seems to be reliable.
 C
-      PDW = 0
+      INFO = 0
+      PDW  = 0
 C
       DO 10 I = 1, K
          AI = AMAP(I)
@@ -162,7 +148,7 @@ C
 C
       PDM = PDW
 C
-      DO 40  IITER = 1, 60
+      DO 40  IITER = 1, 80
 C
 C        Test for deflation.
 C
@@ -182,7 +168,7 @@ C           Compute a randomly chosen initial unitary shift.
 C
             CALL ZLARTG( DCMPLX( ONE, -TWO ), DCMPLX( TWO, TWO ), CS,
      $                   SN, TEMP )
-         ELSE IF ( MOD( IITER, 30 ).EQ.0 ) THEN
+         ELSE IF ( MOD( IITER, 40 ).EQ.0 ) THEN
 C
 C           Ad hoc shift.
 C
@@ -292,14 +278,13 @@ C
          DWORK(PDW+8) = DIMAG( T(2,2) )
    40 CONTINUE
 C
-C     Not converged.
+C     Not converged. Set INFO = 1, but continue. 
 C
       INFO = 1
-      GO TO 80
-C
-C     Converged.
 C
    50 CONTINUE
+C
+C     Converged.
 C
       DO 70  J = 1, 2
          PDW = 0
@@ -316,6 +301,8 @@ C
                SL = INT( LOG( RHS ) / LGBAS )
                DWORK(PDW+1) = DWORK(PDW+1) / ( BASE**DBLE( SL ) )
                DWORK(PDW+2) = DWORK(PDW+2) / ( BASE**DBLE( SL ) )
+            ELSE
+               SL = 0
             END IF
             IF ( S(AMAP(I)).EQ.1 ) THEN
                LHS = TEMPI
@@ -354,14 +341,68 @@ C
          ALPHAI(2) = ALPHAI(1)
          ALPHAR(1) = TEMPR
          ALPHAI(1) = TEMPI
+         TEMPR     = BETA(2)
+         BETA(2)   = BETA(1)
+         BETA(1)   = TEMPR
          TEMPR     = SCAL(2)
          SCAL(2)   = SCAL(1)
          SCAL(1)   = TEMPR
       END IF
 C
-      INFO = 0
+C     Enforce the needed eigenvalue structure for real matrices.
 C
-   80 CONTINUE
+      IF ( ALPHAI(1).NE.ZERO .OR. ALPHAI(2).NE.ZERO ) THEN
+C
+C        Decide if there are two real or complex conjugate eigenvalues.
+C
+         IF ( SCAL(1).GE.SCAL(2) ) THEN
+            SL    = SCAL(1) - SCAL(2)
+            TEMPR = ALPHAR(2) / BASE**DBLE( SL )
+            TEMPI = ALPHAI(2) / BASE**DBLE( SL )
+            LHS   = ALPHAR(1) - TEMPR
+            RHS   = ALPHAI(1) + TEMPI
+            CST   = ALPHAI(1)
+         ELSE
+            SL    = SCAL(2) - SCAL(1)
+            TEMPR = ALPHAR(1) / BASE**DBLE( SL )
+            TEMPI = ALPHAI(1) / BASE**DBLE( SL )
+            LHS   = ALPHAR(2) - TEMPR
+            RHS   = ALPHAI(2) + TEMPI
+            CST   = ALPHAI(2)
+         END IF
+C
+         MISR = DLAPY2( CST, TEMPI )
+         MISC = DLAPY2( LHS, RHS ) / TWO
+C
+         CS = MAX( DLAPY2( ALPHAR(1), ALPHAI(1) ), ONE,
+     $             DLAPY2( ALPHAR(2), ALPHAI(2) ) )
+         IF ( MIN( MISR, MISC ).GT.CS*SQRT( ULP ) )
+     $      INFO = 2
+C
+         IF ( MISR.GT.MISC ) THEN
+C
+C           Conjugate eigenvalues.
+C
+            IF ( SCAL(1).GE.SCAL(2) ) THEN
+               ALPHAR(1) =    ( ALPHAR(1) + TEMPR ) / TWO
+               ALPHAI(1) = ABS( ALPHAI(1) - TEMPI ) / TWO
+               SCAL(2)   = SCAL(1)
+            ELSE
+               ALPHAR(1) =    ( ALPHAR(2) + TEMPR ) / TWO
+               ALPHAI(1) = ABS( ALPHAI(2) - TEMPI ) / TWO
+               SCAL(1)   = SCAL(2)
+            END IF
+            ALPHAR(2) =  ALPHAR(1)
+            ALPHAI(2) = -ALPHAI(1)
+         ELSE
+C
+C           Two real eigenvalues.
+C
+            ALPHAI(1) = ZERO
+            ALPHAI(2) = ZERO
+         END IF
+      END IF
+C
       RETURN
 C *** Last line of MB03BB ***
       END

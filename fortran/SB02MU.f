@@ -1,24 +1,6 @@
       SUBROUTINE SB02MU( DICO, HINV, UPLO, N, A, LDA, G, LDG, Q, LDQ, S,
      $                   LDS, IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To construct the 2n-by-2n Hamiltonian or symplectic matrix S
@@ -91,9 +73,10 @@ C     G       (input) DOUBLE PRECISION array, dimension (LDG,N)
 C             The leading N-by-N upper triangular part (if UPLO = 'U')
 C             or lower triangular part (if UPLO = 'L') of this array
 C             must contain the upper triangular part or lower triangular
-C             part, respectively, of the symmetric matrix G. The stricly
-C             lower triangular part (if UPLO = 'U') or stricly upper
-C             triangular part (if UPLO = 'L') is not referenced.
+C             part, respectively, of the symmetric matrix G.
+C             The strictly lower triangular part (if UPLO = 'U') or
+C             strictly upper triangular part (if UPLO = 'L') is not
+C             referenced.
 C
 C     LDG     INTEGER
 C             The leading dimension of array G.  LDG >= MAX(1,N).
@@ -102,9 +85,10 @@ C     Q       (input) DOUBLE PRECISION array, dimension (LDQ,N)
 C             The leading N-by-N upper triangular part (if UPLO = 'U')
 C             or lower triangular part (if UPLO = 'L') of this array
 C             must contain the upper triangular part or lower triangular
-C             part, respectively, of the symmetric matrix Q. The stricly
-C             lower triangular part (if UPLO = 'U') or stricly upper
-C             triangular part (if UPLO = 'L') is not referenced.
+C             part, respectively, of the symmetric matrix Q.
+C             The strictly lower triangular part (if UPLO = 'U') or
+C             strictly upper triangular part (if UPLO = 'L') is not
+C             referenced.
 C
 C     LDQ     INTEGER
 C             The leading dimension of array Q.  LDQ >= MAX(1,N).
@@ -132,6 +116,12 @@ C             LDWORK >= 1          if DICO = 'C';
 C             LDWORK >= MAX(2,4*N) if DICO = 'D'.
 C             For optimum performance LDWORK should be larger, if
 C             DICO = 'D'.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -165,7 +155,8 @@ C     Release 3.0: V. Sima, Katholieke Univ. Leuven, Belgium, Aug. 1997.
 C
 C     REVISIONS
 C
-C     V. Sima, Research Institute for Informatics, Bucharest, Feb. 2004.
+C     V. Sima, Research Institute for Informatics, Bucharest, Feb. 2004,
+C     Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -185,25 +176,24 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), DWORK(*), G(LDG,*), Q(LDQ,*),
      $                  S(LDS,*)
 C     .. Local Scalars ..
-      LOGICAL           DISCR, LHINV, LUPLO
-      INTEGER           I, J, MAXWRK, N2, NJ, NP1
+      LOGICAL           DISCR, LHINV, LQUERY, LUPLO
+      INTEGER           I, J, MAXWRK, MINWRK, N2, NJ, NP1
       DOUBLE PRECISION  ANORM, RCOND
 C     .. External Functions ..
       LOGICAL           LSAME
-      INTEGER           ILAENV
       DOUBLE PRECISION  DLAMCH, DLANGE
-      EXTERNAL          DLAMCH, DLANGE, ILAENV, LSAME
+      EXTERNAL          DLAMCH, DLANGE, LSAME
 C     .. External Subroutines ..
       EXTERNAL          DCOPY, DGECON, DGEMM, DGETRF, DGETRI, DGETRS,
      $                  DLACPY, DSWAP, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         MAX
+      INTRINSIC         INT, MAX
 C     .. Executable Statements ..
 C
-      INFO  = 0
+      INFO = 0
       N2 = N + N
-      DISCR = LSAME( DICO,  'D' )
-      LUPLO = LSAME( UPLO,  'U' )
+      DISCR = LSAME( DICO, 'D' )
+      LUPLO = LSAME( UPLO, 'U' )
       IF( DISCR ) THEN
          LHINV = LSAME( HINV, 'D' )
       ELSE
@@ -230,9 +220,26 @@ C
          INFO = -10
       ELSE IF( LDS.LT.MAX( 1, N2 ) ) THEN
          INFO = -12
-      ELSE IF( ( LDWORK.LT.1 ) .OR.
-     $         ( DISCR .AND. LDWORK.LT.MAX( 2, 4*N ) ) ) THEN
-         INFO = -15
+      ELSE 
+         MINWRK = MAX( 2, 4*N )
+         LQUERY = LDWORK.EQ.-1
+         IF( ( LDWORK.LT.1 .OR. ( DISCR .AND. LDWORK.LT.MINWRK ) ) .AND.
+     $       .NOT.LQUERY ) THEN
+            INFO = -15
+         ELSE IF( DISCR ) THEN
+C
+C           Compute workspace.
+C           (Note: Comments in the code beginning "Workspace:" describe
+C           the minimal amount of workspace needed at that point in the
+C           code, as well as the preferred amount for good performance.
+C           NB refers to the optimal block size for the immediately
+C           following subroutine, as returned by ILAENV.)
+C
+            CALL DGETRI( N, A, LDA, IWORK, DWORK, -1, INFO )
+            MAXWRK = MAX( MINWRK, INT( DWORK(1) ) ) 
+         ELSE
+            MAXWRK = 1
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -240,6 +247,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'SB02MU', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = MAXWRK
          RETURN
       END IF
 C
@@ -323,15 +333,6 @@ C
 C        Construct the symplectic matrix (2) or (3) in the discrete-time
 C        case.
 C
-C        Compute workspace.
-C        (Note: Comments in the code beginning "Workspace:" describe the
-C        minimal amount of workspace needed at that point in the code,
-C        as well as the preferred amount for good performance.
-C        NB refers to the optimal block size for the immediately
-C        following subroutine, as returned by ILAENV.)
-C
-         MAXWRK = MAX( 4*N,
-     $                 N*ILAENV( 1, 'DGETRI', ' ', N, -1, -1, -1 ) )
          NP1 = N + 1
 C
          IF ( LHINV ) THEN

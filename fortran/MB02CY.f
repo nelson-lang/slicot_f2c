@@ -1,24 +1,6 @@
       SUBROUTINE MB02CY( TYPET, STRUCG, P, Q, N, K, A, LDA, B, LDB, H,
      $                   LDH, CS, LCS, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To apply the transformations created by the SLICOT Library
@@ -140,7 +122,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, July 2000,
-C     February 2004, March 2007.
+C     February 2004, March 2007, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -229,6 +211,7 @@ C
 C        The generator is row wise stored.
 C
          IF ( ISLWR ) THEN
+            MAXWRK = 1
 C
             DO 10  I = 1, K
 C
@@ -299,6 +282,7 @@ C
 C        The generator is column wise stored.
 C
          IF ( ISLWR ) THEN
+            MAXWRK = 1
 C
             DO 30  I = 1, K
 C

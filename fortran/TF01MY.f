@@ -1,24 +1,6 @@
       SUBROUTINE TF01MY( N, M, P, NY, A, LDA, B, LDB, C, LDC, D, LDD,
      $                   U, LDU, X, Y, LDY, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the output sequence of a linear time-invariant
@@ -101,10 +83,17 @@ C
 C     Workspace
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
+C             On exit, if INFO = 0, DWORK(1) returns the optimal LDWORK.
 C
 C     LDWORK  INTEGER
-C             The length of the array DWORK.  LDWORK >= N.
+C             The length of the array DWORK.  LDWORK >= MAX(1,N).
 C             For better performance, LDWORK should be larger.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -147,7 +136,8 @@ C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2001.
 C
 C     REVISIONS
 C
-C     -
+C     V. Sima, Research Institute for Informatics, Bucharest, Apr. 2011,
+C     June 2012.
 C
 C     KEYWORDS
 C
@@ -166,15 +156,13 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), B(LDB,*), C(LDC,*), D(LDD,*),
      $                  DWORK(*), U(LDU,*), X(*), Y(LDY,*)
 C     .. Local Scalars ..
-      INTEGER           IK, IREM, IS, IYL, MAXN, NB, NS
+      LOGICAL           LQUERY
+      INTEGER           IK, IREM, IS, IYL, MAXN, NS, WRKOPT
       DOUBLE PRECISION  UPD
-C     .. External Functions ..
-      INTEGER           ILAENV
-      EXTERNAL          ILAENV
 C     .. External Subroutines ..
-      EXTERNAL          DCOPY, DGEMM, DGEMV, DLASET, XERBLA
+      EXTERNAL          DCOPY, DGEMM, DGEMV, DGEQRF, DLASET, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         MAX, MIN
+      INTRINSIC         INT, MAX, MIN
 C     .. Executable Statements ..
 C
       INFO = 0
@@ -202,8 +190,25 @@ C
          INFO = -14
       ELSE IF( LDY.LT.MAX( 1, NY ) ) THEN
          INFO = -17
-      ELSE IF( LDWORK.LT.N ) THEN
-         INFO = -19
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF( LQUERY ) THEN
+C
+C           Determine the optimal workspace (taken as for LAPACK routine
+C           DGEQRF).
+C
+            CALL DGEQRF( NY, MAX( M, P ), Y, LDY, DWORK, DWORK, -1,
+     $                   INFO )
+            WRKOPT = MAX( INT( DWORK(1) ), 1, 2*N )
+         ELSE
+            IF( MIN( NY, P ).EQ.0 ) THEN
+               IK = 1
+            ELSE
+               IK = MAXN
+            END IF
+            IF( LDWORK.LT.IK )
+     $         INFO = -19
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -212,11 +217,15 @@ C        Error return.
 C
          CALL XERBLA( 'TF01MY', -INFO )
          RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
+         RETURN
       END IF
 C
 C     Quick return if possible.
 C
       IF ( MIN( NY, P ).EQ.0 ) THEN
+         DWORK(1) = ONE
          RETURN
       ELSE IF ( N.EQ.0 ) THEN
 C
@@ -228,19 +237,16 @@ C
             CALL DGEMM( 'No transpose', 'Transpose', NY, P, M, ONE,
      $                  U, LDU, D, LDD, ZERO, Y, LDY )
          END IF
+         DWORK(1) = ONE
          RETURN
       END IF
-C
-C     Determine the block size (taken as for LAPACK routine DGETRF).
-C
-      NB = ILAENV( 1, 'DGETRF', ' ', NY, MAX( M, P ), -1, -1 )
 C
 C     Find the number of state vectors that can be accommodated in
 C     the provided workspace and initialize.
 C
-      NS = MIN( LDWORK/N, NB*NB/N, NY )
+      NS = MIN( LDWORK/N, WRKOPT/N, NY )
 C
-      IF ( NS.LE.1 .OR. NY*MAX( M, P ).LE.NB*NB ) THEN
+      IF ( NS.LE.1 .OR. NY*MAX( M, P ).LE.WRKOPT ) THEN
 C
 C        LDWORK < 2*N or small problem:
 C                     only BLAS 2 calculations are used in the loop
@@ -353,6 +359,7 @@ C
       CALL DGEMM( 'No transpose', 'Transpose', NY, P, M, ONE, U, LDU,
      $            D, LDD, ONE, Y, LDY )
 C
+      DWORK(1) = WRKOPT
       RETURN
 C *** Last line of TF01MY ***
       END

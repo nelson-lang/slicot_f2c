@@ -3,24 +3,6 @@
      $                   KRONL, AF, LDAF, BF, LDBF, TOL, IWORK, DWORK,
      $                   ZWORK, LZWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To construct for a linear multivariable system described by a
@@ -240,7 +222,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2009,
-C     Apr. 2009.
+C     Apr. 2009, Apr. 2011.
 C
 C     KEYWORDS
 C
@@ -267,14 +249,13 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  DWORK(*)
 C     .. Local Scalars ..
       LOGICAL           LEQUIL, LQUERY
-      INTEGER           I, I1, II, J, MM, MNU, MU, NB, NINFZ, NN, NU1,
-     $                  NUMU, NUMU1, PP, RO, SIGMA, WRKOPT
+      INTEGER           I, I1, II, J, MM, MNU, MU, NINFZ, NN, NU1, NUMU,
+     $                  NUMU1, PP, RO, SIGMA, WRKOPT
       DOUBLE PRECISION  MAXRED, SVLMAX, THRESH, TOLER
 C     .. External Functions ..
       LOGICAL           LSAME
-      INTEGER           ILAENV
       DOUBLE PRECISION  DLAMCH, ZLANGE
-      EXTERNAL          DLAMCH, ILAENV, LSAME, ZLANGE
+      EXTERNAL          DLAMCH, LSAME, ZLANGE
 C     .. External Subroutines ..
       EXTERNAL          AB8NXZ, TB01IZ, XERBLA, ZCOPY, ZLACPY, ZLASET,
      $                  ZTZRZF, ZUNMRZ
@@ -324,10 +305,11 @@ C
      $                   INFZ, KRONL, MU, NU, NKROL, TOL, IWORK, DWORK,
      $                   ZWORK, -1, INFO )
             WRKOPT = MAX( WRKOPT, INT( ZWORK(1) ) )
-            NB = ILAENV( 1, 'ZGERQF', ' ', II, N+II, -1, -1 )
-            WRKOPT = MAX( WRKOPT, II + II*NB )
-            NB = MIN( 64, ILAENV( 1, 'ZUNMRQ', 'RC', N, N+II, II, -1 ) )
-            WRKOPT = MAX( WRKOPT, II + N*NB )
+            CALL ZTZRZF( II, N+II, AF, LDAF, ZWORK, ZWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, II + INT( ZWORK(1) ) )
+            CALL ZUNMRZ( 'Right', 'Conjugate transpose', N, N+II, II, N,
+     $                   AF, LDAF, ZWORK, AF, LDAF, ZWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, II + INT( ZWORK(1) ) )
          ELSE IF( LZWORK.LT.I ) THEN
             INFO = -29
          END IF

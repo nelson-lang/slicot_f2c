@@ -1,24 +1,6 @@
       SUBROUTINE MB01RU( UPLO, TRANS, M, N, ALPHA, BETA, R, LDR, A, LDA,
      $                   X, LDX, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the matrix formula
@@ -79,7 +61,9 @@ C             On exit, the leading M-by-M upper triangular part (if
 C             UPLO = 'U'), or lower triangular part (if UPLO = 'L'), of
 C             this array contains the corresponding triangular part of
 C                                 _
-C             the computed matrix R.
+C             the computed matrix R. When R is identified with X in
+C             the call, after exit, the diagonal entries of R must be
+C             divided by 2.
 C
 C     LDR     INTEGER
 C             The leading dimension of array R.  LDR >= MAX(1,M).
@@ -149,8 +133,8 @@ C     NUMERICAL ASPECTS
 C
 C     The algorithm requires approximately
 C
-C                   2         2
-C        3/2 x M x N + 1/2 x M
+C         2             2
+C        M x N + 1/2 x N x M
 C
 C     operations.
 C
@@ -165,7 +149,8 @@ C
 C     REVISIONS
 C
 C     A. Varga, German Aerospace Center, Oberpfaffenhofen, March 2004.
-C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2004.
+C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2004,
+C     Sep. 2013, Dec. 2013.
 C
 C     KEYWORDS
 C

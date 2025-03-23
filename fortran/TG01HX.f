@@ -2,24 +2,6 @@
      $                   E, LDE, B, LDB, C, LDC, Q, LDQ, Z, LDZ, NR,
      $                   NRBLCK, RTAU, TOL, IWORK, DWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     Given the descriptor system (A-lambda*E,B,C) with the system
@@ -36,7 +18,7 @@ C          - E is an L-by-N matrix, with E1 an N1-by-N1 submatrix
 C              with LBE nonzero sub-diagonals,
 C     this routine reduces the pair (A1-lambda*E1,B1) to the form
 C
-C     Qc'*[A1-lambda*E1 B1]*diag(Zc,I) =
+C     Qc'*[B1 A1-lambda*E1]*diag(I,Zc) =
 C
 C                              ( Bc Ac-lambda*Ec      *         )
 C                              (                                ) ,
@@ -70,8 +52,8 @@ C         finite eigenvalues of the pencil (A1-lambda*E1).
 C
 C     The transformations are applied to the whole matrices A, E, B
 C     and C. The left and/or right orthogonal transformations Qc and Zc
-C     performed to reduce the pencil S(lambda) can be optionally
-C     accumulated in the matrices Q and Z, respectivelly.
+C     performed to reduce the pencil can be optionally accumulated
+C     in the matrices Q and Z, respectively.
 C
 C     The reduced order descriptor system (Ac-lambda*Ec,Bc,Cc) has no
 C     uncontrollable finite eigenvalues and has the same
@@ -138,7 +120,7 @@ C                       Qc'*A*Zc = ( 0  Anc  * ) ,
 C                                  ( 0   0   * )
 C
 C             where Ac is NR-by-NR and Anc is (N1-NR)-by-(N1-NR).
-C             The matrix ( Bc Ac ) is in the controlability
+C             The matrix ( Bc Ac ) is in the controllability
 C             staircase form (1).
 C
 C     LDA     INTEGER
@@ -185,7 +167,7 @@ C                       Qc'*B = (    ) ,
 C                               ( 0  )
 C
 C             where Bc is NR-by-M.
-C             The matrix ( Bc Ac ) is in the controlability
+C             The matrix ( Bc Ac ) is in the controllability
 C             staircase form (1).
 C
 C     LDB     INTEGER
@@ -204,16 +186,15 @@ C     Q       (input/output) DOUBLE PRECISION array, dimension (LDQ,L)
 C             If COMPQ = 'N': Q is not referenced.
 C             If COMPQ = 'I': on entry, Q need not be set;
 C                             on exit, the leading L-by-L part of this
-C                             array contains the orthogonal matrix Q,
-C                             where Q' is the product of transformations
+C                             array contains the orthogonal matrix Qc,
+C                             where Qc' is the product of transformations
 C                             which are applied to A, E, and B on
 C                             the left.
 C             If COMPQ = 'U': on entry, the leading L-by-L part of this
-C                             array must contain an orthogonal matrix
-C                             Qc;
+C                             array must contain an orthogonal matrix Q;
 C                             on exit, the leading L-by-L part of this
 C                             array contains the orthogonal matrix
-C                             Qc*Q.
+C                             Q*Qc.
 C
 C     LDQ     INTEGER
 C             The leading dimension of array Q.
@@ -224,15 +205,14 @@ C     Z       (input/output) DOUBLE PRECISION array, dimension (LDZ,N)
 C             If COMPZ = 'N': Z is not referenced.
 C             If COMPZ = 'I': on entry, Z need not be set;
 C                             on exit, the leading N-by-N part of this
-C                             array contains the orthogonal matrix Z,
+C                             array contains the orthogonal matrix Zc,
 C                             which is the product of transformations
 C                             applied to A, E, and C on the right.
 C             If COMPZ = 'U': on entry, the leading N-by-N part of this
-C                             array must contain an orthogonal matrix
-C                             Zc;
+C                             array must contain an orthogonal matrix Z;
 C                             on exit, the leading N-by-N part of this
 C                             array contains the orthogonal matrix
-C                             Zc*Z.
+C                             Z*Zc.
 C
 C     LDZ     INTEGER
 C             The leading dimension of array Z.
@@ -272,7 +252,7 @@ C     Workspace
 C
 C     IWORK   INTEGER array, dimension (M)
 C
-C     DWORK   DOUBLE PRECISION array, dimension MAX(N,L,2*M)
+C     DWORK   DOUBLE PRECISION array, dimension (MAX(N,L,2*M))
 C
 C     Error Indicator
 C
@@ -287,7 +267,7 @@ C     The subroutine is based on the reduction algorithm of [1].
 C
 C     REFERENCES
 C
-C     [1] A. Varga
+C     [1] Varga, A.
 C         Computation of Irreducible Generalized State-Space
 C         Realizations.
 C         Kybernetika, vol. 26, pp. 89-106, 1990.
@@ -308,6 +288,7 @@ C     V. Sima, Research Institute for Informatics, Bucharest, July 1999,
 C     May 2003, Nov. 2003.
 C     A. Varga, German Aerospace Center, Oberpfaffenhofen, Nov. 2003.
 C     V. Sima, Jan. 2010, following Bujanovic and Drmac's suggestion.
+C     V. Sima, Apr. 2017, Mar. 2019.
 C
 C     KEYWORDS
 C
@@ -335,16 +316,16 @@ C     .. Local Scalars ..
       LOGICAL            ILQ, ILZ, WITHC
       INTEGER            I, IC, ICOL, ICOMPQ, ICOMPZ, IROW, ISMAX,
      $                   ISMIN, J, K, MN, NF, NR1, RANK, TAUIM1
-      DOUBLE PRECISION   CO, C1, C2, RCOND, SMAX, SMAXPR, SMIN, SMINPR,
-     $                   SVLMAX, S1, S2, SI, T, TOLZ, TT
+      DOUBLE PRECISION   C1, C2, CO, NRMA, RCOND, S1, S2, SI, SMAX,
+     $                   SMAXPR, SMIN, SMINPR, SVLMAX, T, TOLZ, TT
 C     .. External Functions ..
       LOGICAL            LSAME
       INTEGER            IDAMAX
-      DOUBLE PRECISION   DLAMCH, DLANGE, DLAPY2, DNRM2
-      EXTERNAL           DLAMCH, DLANGE, DLAPY2, DNRM2, IDAMAX, LSAME
+      DOUBLE PRECISION   DLAMCH, DLANGE, DNRM2
+      EXTERNAL           DLAMCH, DLANGE, DNRM2, IDAMAX, LSAME
 C     .. External Subroutines ..
-      EXTERNAL           DLACPY, DLARF, DLARFG, DLARTG, DLASET, DROT,
-     $                   DSWAP, XERBLA
+      EXTERNAL           DLACPY, DLAIC1, DLARF, DLARFG, DLARTG, DLASET,
+     $                   DROT, DSWAP, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, MAX, MIN, SQRT
 C
@@ -439,18 +420,15 @@ C
 C
       TOLZ   = SQRT( DLAMCH( 'Epsilon' ) )
       WITHC  = P.GT.0
-      SVLMAX = DLAPY2( DLANGE( 'F', L, M, B, LDB, DWORK ),
-     $                 DLANGE( 'F', L, N, A, LDA, DWORK ) )
-      RCOND = TOL
+      SVLMAX = ZERO
+      NRMA   = DLANGE( 'F', L, N, A, LDA, DWORK )
+      RCOND  = TOL
       IF ( RCOND.LE.ZERO ) THEN
 C
 C        Use the default tolerance in controllability determination.
 C
          RCOND = DBLE( L*N )*DLAMCH( 'EPSILON' )
       END IF
-C
-      IF ( SVLMAX.LT.RCOND )
-     $   SVLMAX = ONE
 C
 C     Reduce E to upper triangular form if necessary.
 C
@@ -488,8 +466,7 @@ C
             END IF
             E(I,I) = T
    10    CONTINUE
-         IF( N1.GT.1 )
-     $      CALL DLASET( 'Lower', N1-1, N1-1, ZERO, ZERO, E(2,1), LDE )
+         CALL DLASET( 'Lower', N1-1, N1-1, ZERO, ZERO, E(2,1), LDE )
       END IF
 C
       ISMIN = 1
@@ -509,9 +486,12 @@ C
          ICOL = IC + TAUIM1
          IROW = NR
          NR1 = NR + 1
-         IF( NR.GT.0 )
-     $      CALL DLACPY( 'Full', NF, TAUIM1, A(NR1,IC+1), LDA,
+         IF( NR.GT.0 ) THEN
+            CALL DLACPY( 'Full', NF, TAUIM1, A(NR1,IC+1), LDA,
      $                   B(NR1,1), LDB )
+            IF( SVLMAX.EQ.ZERO )
+     $          SVLMAX = NRMA
+         END IF
 C
 C        Perform QR-decomposition with column pivoting on the current B
 C        while keeping E upper triangular.
@@ -583,10 +563,10 @@ C
 C
             IF( RANK.EQ.0 ) THEN
 C
-C              Initialize; exit if matrix is zero (RANK = 0).
+C              Initialize; exit if the matrix is negligible (RANK = 0).
 C
                SMAX = ABS( B(NR1,1) )
-               IF ( SMAX.EQ.ZERO ) GO TO 80
+               IF ( SMAX.LE.RCOND ) GO TO 80
                SMIN = SMAX
                SMAXPR = SMAX
                SMINPR = SMIN
@@ -606,7 +586,7 @@ C           Check the rank; finish the loop if rank loss occurs.
 C
             IF( SVLMAX*RCOND.LE.SMAXPR ) THEN
                IF( SVLMAX*RCOND.LE.SMINPR ) THEN
-                  IF( SMAXPR*RCOND.LE.SMINPR ) THEN
+                  IF( SMAXPR*RCOND.LT.SMINPR ) THEN
 C
 C                    Finish the loop if last row.
 C

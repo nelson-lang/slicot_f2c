@@ -1,24 +1,6 @@
       SUBROUTINE MB04PB( N, ILO, A, LDA, QG, LDQG, CS, TAU, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To reduce a Hamiltonian matrix,
@@ -97,6 +79,12 @@ C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.  LDWORK >= MAX(1,N-1).
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -107,7 +95,7 @@ C
 C     METHOD
 C
 C     The matrix U is represented as a product of symplectic reflectors
-C     and Givens rotators
+C     and Givens rotations
 C
 C     U = diag( H(1),H(1) )     G(1)   diag( F(1),F(1) )
 C         diag( H(2),H(2) )     G(2)   diag( F(2),F(2) )
@@ -130,7 +118,7 @@ C     where nu is a real scalar, and w is a real vector with
 C     w(1:i) = 0 and w(i+1) = 1; w(i+2:n) is stored on exit in
 C     A(i+2:n,i), and nu in TAU(i).
 C
-C     Each G(i) is a Givens rotator acting on rows i+1 and n+i+1,
+C     Each G(i) is a Givens rotation acting on rows i+1 and n+i+1,
 C     where the cosine is stored in CS(2*i-1) and the sine in
 C     CS(2*i).
 C
@@ -158,6 +146,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Nov. 2008 (SLICOT version of the HAPACK routine DHAPVB).
+C     V. Sima, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -173,21 +162,23 @@ C     .. Scalar Arguments ..
 C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), CS(*), DWORK(*), QG(LDQG,*), TAU(*)
 C     .. Local Scalars ..
-      INTEGER           I, IB, IERR, NB, NBMIN, NH, NIB, NNB, NX, PDW,
-     $                  PXA, PXG, PXQ, PYA, WRKOPT
+      LOGICAL           LQUERY
+      INTEGER           I, IB, IERR, MINWRK, NB, NBMIN, NH, NIB, NNB,
+     $                  NX, PDW, PXA, PXG, PXQ, PYA, WRKOPT
 C     .. External Functions ..
       INTEGER           UE01MD
       EXTERNAL          UE01MD
 C     .. External Subroutines ..
-      EXTERNAL          DGEMM, DSYR2K, MB04PA, MB04PU, XERBLA
+      EXTERNAL          DGEHRD, DGEMM, DSYR2K, MB04PA, MB04PU, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         DBLE, MAX, MIN
+      INTRINSIC         DBLE, INT, MAX, MIN
 C
 C     .. Executable Statements ..
 C
 C     Check the scalar input parameters.
 C
-      INFO = 0
+      INFO   = 0
+      MINWRK = MAX( 1, N-1 )
       IF ( N.LT.0 ) THEN
          INFO = -1
       ELSE IF ( ILO.LT.1 .OR. ILO.GT.MAX( 1, N ) ) THEN
@@ -196,9 +187,26 @@ C
          INFO = -4
       ELSE IF ( LDQG.LT.MAX( 1, N ) ) THEN
          INFO = -6
-      ELSE IF ( LDWORK.LT.MAX( 1, N-1 ) ) THEN
-         DWORK(1) = DBLE( MAX( 1, N-1 ) )
-         INFO = -10
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF ( LDWORK.LT.MINWRK .AND. .NOT.LQUERY ) THEN
+            DWORK(1) = DBLE( MINWRK )
+            INFO = -10
+         ELSE
+            IF ( N.EQ.0 ) THEN
+               WRKOPT = ONE
+            ELSE
+               CALL DGEHRD( N, ILO, N, DWORK, N, DWORK, DWORK, -1,
+     $                      INFO )
+               WRKOPT = MAX( MINWRK, INT( DWORK(1) ) ) 
+               NB     = INT( WRKOPT/N )
+               WRKOPT = MAX( WRKOPT, 8*N*NB + 3*NB )
+            END IF
+            IF ( LQUERY ) THEN
+               DWORK(1) = DBLE( WRKOPT )
+               RETURN
+            END IF
+         END IF
       END IF
 C
 C     Return if there were illegal values.
@@ -226,9 +234,7 @@ C
 C     Determine the block size.
 C
       NH = N - ILO + 1
-      NB = UE01MD( 1, 'MB04PB', ' ', N, ILO, -1 )
       NBMIN = 2
-      WRKOPT = N-1
       IF ( NB.GT.1 .AND. NB.LT.NH ) THEN
 C
 C        Determine when to cross over from blocked to unblocked code.
@@ -238,7 +244,6 @@ C
 C
 C           Check whether workspace is large enough for blocked code.
 C
-            WRKOPT = 8*N*NB + 3*NB
             IF ( LDWORK.LT.WRKOPT ) THEN
 C
 C              Not enough workspace available. Determine minimum value

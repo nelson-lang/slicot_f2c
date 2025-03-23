@@ -5,24 +5,6 @@
      $                   CW, LDCW, DW, LDDW, NS, HSV, TOL1, TOL2,
      $                   IWORK, DWORK, LDWORK, IWARN, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a reduced order model (Ar,Br,Cr,Dr) for an original
@@ -582,8 +564,8 @@ C     .. Array Arguments ..
      $                  HSV(*)
 C     .. Local Scalars ..
       CHARACTER         JOBVL, JOBWL
-      LOGICAL           AUTOM, CONJV, CONJW, DISCR, FIXORD, FRWGHT,
-     $                  INVFR, LEFTI, LEFTW, RIGHTI, RIGHTW
+      LOGICAL           AUTOM, CONJV, CONJW, DISCR, FIXORD, INVFR,
+     $                  LEFTI, LEFTW, RIGHTI, RIGHTW
       INTEGER           IERR, IWARNL, KAV, KAW, KBV, KBW, KCV, KCW, KDV,
      $                  KDW, KEV, KEW, KI, KL, KU, KW, LDABV, LDABW,
      $                  LDCDV, LDCDW, LW, NRA, NU, NU1, NVP, NWM, RANK
@@ -611,7 +593,6 @@ C
       RIGHTI = LSAME( JOBW, 'I' ) .OR. LSAME( JOBW, 'R' )
       RIGHTW = LSAME( JOBW, 'W' ) .OR. LSAME( JOBW, 'C' ) .OR. RIGHTI
       CONJW  = LSAME( JOBW, 'C' ) .OR. LSAME( JOBW, 'R' )
-      FRWGHT = LEFTW .OR. RIGHTW
       INVFR  = LSAME( JOBINV, 'N' )
       AUTOM  = LSAME( JOBINV, 'A' )
 C

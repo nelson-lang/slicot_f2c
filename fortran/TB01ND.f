@@ -1,24 +1,6 @@
       SUBROUTINE TB01ND( JOBU, UPLO, N, P, A, LDA, C, LDC, U, LDU,
      $                   DWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To reduce the pair (A,C) to lower or upper observer Hessenberg
@@ -54,7 +36,7 @@ C             matrix A.  N >= 0.
 C
 C     P       (input) INTEGER
 C             The actual output dimension, i.e. the number of rows of
-C             the matrix C.  P >= 0.
+C             the matrix C.  0 <= P <= N.
 C
 C     A       (input/output) DOUBLE PRECISION array, dimension (LDA,N)
 C             On entry, the leading N-by-N part of this array must
@@ -148,6 +130,7 @@ C
 C     if UPLO = 'L'.
 C
 C     If P >= N, then the matrix CU is trapezoidal and U'AU is full.
+C     If P  = 0, but N > 0, the array A is unchanged on exit.
 C
 C     REFERENCES
 C
@@ -169,7 +152,7 @@ C     P. Van Dooren, Philips Research Laboratory, Brussels, Belgium.
 C
 C     REVISIONS
 C
-C     February 1997.
+C     February 1997, April 2021.
 C
 C     KEYWORDS
 C
@@ -213,7 +196,7 @@ C
          INFO = -2
       ELSE IF( N.LT.0 ) THEN
          INFO = -3
-      ELSE IF( P.LT.0 ) THEN
+      ELSE IF( P.LT.0 .OR. P.GT.N ) THEN
          INFO = -4
       ELSE IF( LDA.LT.MAX( 1, N ) ) THEN
          INFO = -6
@@ -232,6 +215,13 @@ C
          RETURN
       END IF
 C
+      IF ( LJOBI ) THEN
+C
+C        Initialize U to the identity matrix.
+C
+         CALL DLASET( 'Full', N, N, ZERO, ONE, U, LDU )
+      END IF
+C
 C     Quick return if possible.
 C
       IF ( N.EQ.0 .OR. P.EQ.0 )
@@ -239,13 +229,6 @@ C
 C
       P1 = P + 1
       N1 = N - 1
-C
-      IF ( LJOBI ) THEN
-C
-C        Initialize U to the identity matrix.
-C
-         CALL DLASET( 'Full', N, N, ZERO, ONE, U, LDU )
-      END IF
 C
 C     Perform transformations involving both C and A.
 C

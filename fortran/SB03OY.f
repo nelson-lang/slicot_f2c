@@ -1,24 +1,6 @@
       SUBROUTINE SB03OY( DISCR, LTRANS, ISGN, S, LDS, R, LDR, A, LDA,
      $                   SCALE, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve for the Cholesky factor  U  of  X,
@@ -164,7 +146,8 @@ C     Bochum, May 1992.
 C
 C     REVISIONS
 C
-C     Dec. 1997, April 1998.
+C     V. Sima, Dec. 1997, April 1998, Aug. 2012, Jan. - Feb. 2022.
+C     D. Kressner, ETH Zurich, May 2011. 
 C
 C     KEYWORDS
 C
@@ -221,8 +204,7 @@ C
       SMLNUM = SMLNUM*FOUR / EPS
       BIGNUM = ONE / SMLNUM
 C
-      SMIN = MAX( SMLNUM, EPS*MAX( ABS( S11 ), ABS( S12 ),
-     $                             ABS( S21 ), ABS( S22 ) ) )
+      SMIN  = SMLNUM
       SCALE = ONE
 C
       CALL DLANV2( S11, S12, S21, S22, TEMPR, TEMPI, E1, E2, CSP, CSQ )
@@ -248,7 +230,7 @@ C
       TEMP(1) = S(1,1) - E1
       TEMP(2) = E2
       IF ( LTRANS ) TEMP(2) = -E2
-      CALL SB03OV( TEMP, S(2,1), CSQ, SNQ )
+      CALL SB03OV( TEMP, S(2,1), SMLNUM, CSQ, SNQ )
 C
 C     beta in (6.9) is given by  beta = E1 + i*E2,  compute  t.
 C
@@ -268,7 +250,7 @@ C        Compute the cos and sine that define  Phat.
 C
          TEMP(1) =  CSQ(1)*R(2,2) - SNQ*R(1,2)
          TEMP(2) = -CSQ(2)*R(2,2)
-         CALL SB03OV( TEMP, -SNQ*R(1,1), CSP, SNP )
+         CALL SB03OV( TEMP, -SNQ*R(1,1), SMLNUM, CSP, SNP )
 C
 C        Compute p1, p2 and p3 of the relation corresponding to (6.11).
 C
@@ -289,7 +271,7 @@ C        Compute the cos and sine that define  Phat.
 C
          TEMP(1) = CSQ(1)*R(1,1) + SNQ*R(1,2)
          TEMP(2) = CSQ(2)*R(1,1)
-         CALL SB03OV( TEMP, SNQ*R(2,2), CSP, SNP )
+         CALL SB03OV( TEMP, SNQ*R(2,2), SMLNUM, CSP, SNP )
 C
 C        Compute p1, p2 and p3 of (6.11).
 C
@@ -517,7 +499,7 @@ C        Obtain u11 from the RQ-factorization of X. The conjugate of
 C        X22 should be taken.
 C
          X22(2) = -X22(2)
-         CALL SB03OV( X22, X21(1), CST, SNT )
+         CALL SB03OV( X22, X21(1), SMLNUM, CST, SNT )
          R(2,2) = X22(1)
          R(1,2) = CST(1)*X12(1) - CST(2)*X12(2) + SNT*X11(1)
          TEMPR  = CST(1)*X11(1) + CST(2)*X11(2) - SNT*X12(1)
@@ -547,7 +529,7 @@ C
 C
 C        Obtain u11 from the QR-factorization of X.
 C
-         CALL SB03OV( X11, X21(1), CST, SNT )
+         CALL SB03OV( X11, X21(1), SMLNUM, CST, SNT )
          R(1,1) = X11(1)
          R(1,2) = CST(1)*X12(1) + CST(2)*X12(2) + SNT*X22(1)
          TEMPR  = CST(1)*X22(1) - CST(2)*X22(2) - SNT*X12(1)
@@ -566,7 +548,8 @@ C
 C     The computations below are not needed when B and A are not
 C     useful. Compute delta, eta and gamma as in (6.21) or (10.26).
 C
-      IF ( ( Y(1).EQ.ZERO ).AND.( Y(2).EQ.ZERO ) ) THEN
+      IF ( ( ABS( Y(1) ).LT.SMLNUM ).AND.( ABS( Y(2) ).LE.SMLNUM ) )
+     $      THEN
          DELTA(1) = ZERO
          DELTA(2) = ZERO
          GAMMA(1) = ZERO

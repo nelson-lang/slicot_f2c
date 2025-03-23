@@ -1,28 +1,10 @@
       SUBROUTINE MB04WR( JOB, TRANS, N, ILO, Q1, LDQ1, Q2, LDQ2, CS,
      $                   TAU, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To generate orthogonal symplectic matrices U or V, defined as
-C     products of symplectic reflectors and Givens rotators
+C     products of symplectic reflectors and Givens rotations
 C
 C     U = diag( HU(1),HU(1) )  GU(1)  diag( FU(1),FU(1) )
 C         diag( HU(2),HU(2) )  GU(2)  diag( FU(2),FU(2) )
@@ -118,10 +100,10 @@ C
 C     CS      (input) DOUBLE PRECISION array, dimension (2N)
 C             On entry, if  JOB = 'U'  then the first 2N elements of
 C             this array must contain the cosines and sines of the
-C             symplectic Givens rotators GU(i).
+C             symplectic Givens rotations GU(i).
 C             If  JOB = 'V'  then the first 2N-2 elements of this array
 C             must contain the cosines and sines of the symplectic
-C             Givens rotators GV(i).
+C             Givens rotations GV(i).
 C
 C     TAU     (input) DOUBLE PRECISION array, dimension (N)
 C             On entry, if  JOB = 'U'  then the first N elements of
@@ -142,6 +124,12 @@ C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.
 C             LDWORK >= MAX(1,2*(N-ILO+1)).
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -169,6 +157,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DOSGSU).
+C     V. Sima, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -186,15 +175,15 @@ C     .. Scalar Arguments ..
 C     .. Array Arguments ..
       DOUBLE PRECISION  CS(*), DWORK(*), Q1(LDQ1,*), Q2(LDQ2,*), TAU(*)
 C     .. Local Scalars ..
-      LOGICAL           COMPU, LTRAN
-      INTEGER           I, IERR, J, NH
+      LOGICAL           COMPU, LQUERY, LTRAN
+      INTEGER           I, IERR, J, MINWRK, NH, WRKOPT
 C     .. External Functions ..
       LOGICAL           LSAME
       EXTERNAL          LSAME
 C     .. External Subroutines ..
       EXTERNAL          DLASET, MB04WD, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         DBLE, MAX
+      INTRINSIC         DBLE, INT, MAX
 C
 C     .. Executable Statements ..
 C
@@ -215,9 +204,28 @@ C
          INFO = -6
       ELSE IF ( LDQ2.LT.MAX( 1, N ) ) THEN
          INFO = -8
-      ELSE IF ( LDWORK.LT.MAX( 1, 2*( N-ILO+1 ) ) ) THEN
-         DWORK(1) = DBLE( MAX( 1, 2*( N-ILO+1 ) ) )
-         INFO = -12
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF ( COMPU ) THEN
+            NH = N - ILO + 1
+         ELSE
+            NH = N - ILO
+         END IF
+         MINWRK = MAX( 1, 2*NH )
+         IF ( LQUERY ) THEN
+            IF ( NH.LT.0 ) THEN
+               WRKOPT = ONE
+            ELSE
+               CALL MB04WD( TRANS, TRANS, NH, NH, NH, Q1, LDQ1, Q2,
+     $                      LDQ2, CS, TAU, DWORK, -1, IERR )
+               WRKOPT = MAX( MINWRK, INT( DWORK(1) ) ) 
+            END IF
+            DWORK(1) = DBLE( WRKOPT )
+            RETURN
+         ELSE IF ( LDWORK.LT.MINWRK ) THEN
+            DWORK(1) = DBLE( MINWRK )
+            INFO = -12
+         END IF
       END IF
 C
 C     Return if there were illegal values.
@@ -241,26 +249,21 @@ C
          CALL DLASET( 'All', N, ILO-1, ZERO, ZERO, Q2, LDQ2 )
          CALL DLASET( 'All', ILO-1, N-ILO+1, ZERO, ZERO, Q2(1,ILO),
      $                LDQ2 )
-         NH = N - ILO + 1
       END IF
       IF ( COMPU .AND. .NOT.LTRAN ) THEN
 C
 C        Generate U1 and U2.
 C
-         IF ( NH.GT.0 ) THEN
-            CALL MB04WD( 'No Transpose', 'No Transpose', NH, NH, NH,
-     $                   Q1(ILO,ILO), LDQ1, Q2(ILO,ILO), LDQ2, CS(ILO),
-     $                   TAU(ILO), DWORK, LDWORK, IERR )
-         END IF
+         CALL MB04WD( 'No Transpose', 'No Transpose', NH, NH, NH,
+     $                Q1(ILO,ILO), LDQ1, Q2(ILO,ILO), LDQ2, CS(ILO),
+     $                TAU(ILO), DWORK, LDWORK, IERR )
       ELSE IF ( COMPU.AND.LTRAN ) THEN
 C
 C        Generate U1**T and U2.
 C
-         IF ( NH.GT.0 ) THEN
-            CALL MB04WD( 'Transpose', 'No Transpose', NH, NH, NH,
-     $                   Q1(ILO,ILO), LDQ1, Q2(ILO,ILO), LDQ2, CS(ILO),
-     $                   TAU(ILO), DWORK, LDWORK, IERR )
-         END IF
+         CALL MB04WD( 'Transpose', 'No Transpose', NH, NH, NH,
+     $                Q1(ILO,ILO), LDQ1, Q2(ILO,ILO), LDQ2, CS(ILO),
+     $                TAU(ILO), DWORK, LDWORK, IERR )
       ELSE IF ( .NOT.COMPU .AND. .NOT.LTRAN ) THEN
 C
 C        Generate V1**T and V2**T.
@@ -293,11 +296,12 @@ C
    70       CONTINUE
    80    CONTINUE
 C
-         NH = N - ILO
          IF ( NH.GT.0 ) THEN
             CALL MB04WD( 'Transpose', 'Transpose', NH, NH, NH,
      $                   Q1(ILO+1,ILO+1), LDQ1, Q2(ILO+1,ILO+1), LDQ2,
      $                   CS(ILO), TAU(ILO), DWORK, LDWORK, IERR )
+         ELSE
+            DWORK(1) = ONE
          END IF
       ELSE IF ( .NOT.COMPU .AND. LTRAN ) THEN
 C
@@ -327,12 +331,13 @@ C
                Q2(J,I) = ZERO
   140       CONTINUE
   150    CONTINUE
-         NH = N - ILO
 C
          IF ( NH.GT.0 ) THEN
             CALL MB04WD( 'No Transpose', 'Transpose', NH, NH, NH,
      $                   Q1(ILO+1,ILO+1), LDQ1, Q2(ILO+1,ILO+1), LDQ2,
      $                   CS(ILO), TAU(ILO), DWORK, LDWORK, IERR )
+         ELSE
+            DWORK(1) = ONE
          END IF
       END IF
       RETURN

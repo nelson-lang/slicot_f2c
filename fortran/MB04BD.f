@@ -3,24 +3,6 @@
      $                   LDF, C2, LDC2, ALPHAR, ALPHAI, BETA, IWORK,
      $                   LIWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the eigenvalues of a real N-by-N skew-Hamiltonian/
@@ -48,10 +30,10 @@ C
 C     and Aout, Bout, C1out are upper triangular, C2out is upper quasi-
 C     triangular and Dout and Fout are skew-symmetric. The notation M'
 C     denotes the transpose of the matrix M.
-C     Optionally, if COMPQ1 = 'I', the orthogonal transformation matrix
-C     Q1 will be computed.
-C     Optionally, if COMPQ2 = 'I', the orthogonal transformation matrix
-C     Q2 will be computed.
+C     Optionally, if COMPQ1 = 'I' or COMPQ1 = 'U', then the orthogonal
+C     transformation matrix Q1 will be computed.
+C     Optionally, if COMPQ2 = 'I' or COMPQ2 = 'U', then the orthogonal
+C     transformation matrix Q2 will be computed.
 C
 C     ARGUMENTS
 C
@@ -92,7 +74,7 @@ C
 C     Input/Output Parameters
 C
 C     N       (input) INTEGER
-C             The order of the pencil aS - bH.  N has to be even.
+C             The order of the pencil aS - bH.  N >= 0, even.
 C
 C     A       (input/output) DOUBLE PRECISION array, dimension
 C                            (LDA, N/2)
@@ -118,9 +100,9 @@ C             matrix D.
 C             The entries on the diagonal and the first superdiagonal of
 C             this array need not be set, but are assumed to be zero.
 C             On exit, if JOB = 'T', the leading N/2-by-N/2 strictly
-C             upper triangular part of the submatrix in the columns
-C             2 to N/2+1 of this array contains the strictly upper
-C             triangular part of the skew-symmetric matrix Dout.
+C             upper triangular part of the submatrix in the columns 2 to
+C             N/2+1 of this array contains the strictly upper triangular
+C             part of the skew-symmetric matrix Dout.
 C             If JOB = 'E', the leading N/2-by-N/2 strictly upper
 C             triangular part of the submatrix in the columns 2 to N/2+1
 C             of this array contains the strictly upper triangular part
@@ -133,12 +115,12 @@ C             The leading dimension of the array DE.
 C             LDDE >= MAX(1, N/2).
 C
 C     C1      (input/output) DOUBLE PRECISION array, dimension
-C                           (LDC1, N/2)
+C                            (LDC1, N/2)
 C             On entry, the leading N/2-by-N/2 part of this array must
 C             contain the matrix C1 = C.
 C             On exit, if JOB = 'T', the leading N/2-by-N/2 part of this
-C             array contains the matrix C1out; otherwise, it contains the
-C             upper triangular matrix C1 obtained just before the
+C             array contains the matrix C1out; otherwise, it contains
+C             the upper triangular matrix C1 obtained just before the
 C             application of the periodic QZ algorithm.
 C
 C     LDC1    INTEGER
@@ -251,27 +233,67 @@ C             Specifically, only eigenvalues with imaginary parts
 C             greater than or equal to zero are stored; their conjugate
 C             eigenvalues are not stored. If imaginary parts are zero
 C             (i.e., for real eigenvalues), only positive eigenvalues
-C             are stored.
+C             are stored. The remaining eigenvalues have opposite signs.
+C             As a consequence, pairs of complex eigenvalues, stored in
+C             consecutive locations, are not complex conjugate.
 C
 C     Workspace
 C
 C     IWORK   INTEGER array, dimension (LIWORK)
+C             On exit, if INFO = 3, IWORK(1) contains the number of
+C             (pairs of) possibly inaccurate eigenvalues, q <= N/2, and
+C             IWORK(2), ..., IWORK(q+1) indicate their indices.
+C             Specifically, a positive value is an index of a real or
+C             purely imaginary eigenvalue, corresponding to a 1-by-1
+C             block, while the absolute value of a negative entry in
+C             IWORK is an index to the first eigenvalue in a pair of
+C             consecutively stored eigenvalues, corresponding to a
+C             2-by-2 block. A 2-by-2 block may have two complex, two
+C             real, two purely imaginary, or one real and one purely
+C             imaginary eigenvalue.
+C             For i = q+2, ..., 2*q+1, IWORK(i) contains a pointer to
+C             the starting location in DWORK of the (i-q-1)-th quadruple
+C             of 1-by-1 blocks, if IWORK(i-q) > 0, or 2-by-2 blocks,
+C             if IWORK(i-q) < 0, defining unreliable eigenvalues.
+C             IWORK(2*q+2) contains the number of the 1-by-1 blocks, and
+C             IWORK(2*q+3) contains the number of the 2-by-2 blocks,
+C             corresponding to unreliable eigenvalues. IWORK(2*q+4)
+C             contains the total number t of the 2-by-2 blocks.
+C             If INFO = 0, then q = 0, therefore IWORK(1) = 0.
 C
 C     LIWORK  INTEGER
-C             The dimension of the array IWORK.
-C             LIWORK >= N/2+12.
+C             The dimension of the array IWORK.  LIWORK >= N+12.
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
-C             On exit, if INFO = 0, DWORK(1) returns the optimal LDWORK.
-C             On exit, if INFO = -27, DWORK(1) returns the minimum
-C             value of LDWORK.
+C             On exit, if INFO = 0 or INFO = 3, DWORK(1) returns the
+C             optimal LDWORK, and DWORK(2), ..., DWORK(5) contain the
+C             Frobenius norms of the factors of the formal matrix
+C             product used by the algorithm. In addition, DWORK(6), ...,
+C             DWORK(5+4*s) contain the s quadruple values corresponding
+C             to the 1-by-1 blocks. Their eigenvalues are real or purely
+C             imaginary. Such an eigenvalue is obtained from
+C             -i*sqrt(a1*a3/a2/a4), but always taking a positive sign,
+C             where a1, ..., a4 are the corresponding quadruple values.
+C             Moreover, DWORK(6+4*s), ..., DWORK(5+4*s+16*t) contain the
+C             t groups of quadruple 2-by-2 matrices corresponding to the
+C             2-by-2 blocks. Their eigenvalue pairs are either complex,
+C             or placed on the real and imaginary axes. Such an
+C             eigenvalue pair is obtained as -1i*sqrt(ev), but taking
+C             positive imaginary parts, where ev are the eigenvalues of
+C             the product A1*inv(A2)*A3*inv(A4), where A1, ..., A4
+C             define the corresponding 2-by-2 matrix quadruple.
+C             On exit, if INFO = -27, DWORK(1) returns the minimum value
+C             of LDWORK.
 C
 C     LDWORK  INTEGER
 C             The dimension of the array DWORK.
 C             If JOB = 'E' and COMPQ1 = 'N' and COMPQ2 = 'N',
-C                LDWORK >= N**2 + MAX(N,32);
+C                LDWORK >= N**2 + MAX(L,36);
 C             if JOB = 'T' or COMPQ1 <> 'N' or COMPQ2 <> 'N',
-C                LDWORK >= 2*N**2 + MAX(N,32).
+C                LDWORK >= 2*N**2 + MAX(L,36);
+C             where
+C                L = 4*N + 4, if N/2 is even, and
+C                L = 4*N,     if N/2 is odd.
 C             For good performance LDWORK should generally be larger.
 C
 C     Error Indicator
@@ -281,7 +303,9 @@ C             = 0: succesful exit;
 C             < 0: if INFO = -i, the i-th argument had an illegal value;
 C             = 1: problem during computation of the eigenvalues;
 C             = 2: periodic QZ algorithm did not converge in the SLICOT
-C                  Library subroutine MB03BD.
+C                  Library subroutine MB03BD;
+C             = 3: some eigenvalues might be inaccurate, and details can
+C                  be found in IWORK and DWORK. This is a warning.
 C
 C     METHOD
 C
@@ -313,7 +337,11 @@ C
 C     REVISIONS
 C
 C     V. Sima, Oct. 2009 (SLICOT version of the routine DHAUTR).
-C     V. Sima, Nov. 2010.
+C     V. Sima, Nov. 2010, Feb. 2011, Oct. 2011.
+C     M. Voigt, Jan. 2012, July 2014.
+C     V. Sima, Oct. 2012, Jan. 2013, Feb. 2013, July 2013, Aug. 2014,
+C     Sep. 2016, Nov. 2016, Jan. 2017, Apr. 2018, Mar. 2019, Mar. 2020,
+C     Apr. 2020, Apr. 2021, July 2022.
 C
 C     KEYWORDS
 C
@@ -323,9 +351,9 @@ C
 C     ******************************************************************
 C
 C     .. Parameters ..
-      DOUBLE PRECISION   ZERO, HALF, ONE, TWO
+      DOUBLE PRECISION   ZERO, HALF, ONE, TWO, FIVE
       PARAMETER          ( ZERO = 0.0D+0, HALF = 0.5D+0, ONE = 1.0D+0,
-     $                     TWO  = 2.0D+0 )
+     $                     TWO  = 2.0D+0, FIVE = 5.0D+0 )
 C
 C     .. Scalar Arguments ..
       CHARACTER          COMPQ1, COMPQ2, JOB
@@ -342,29 +370,30 @@ C     .. Array Arguments ..
 C
 C     .. Local Scalars ..
       LOGICAL            LCMPQ1, LCMPQ2, LINIQ1, LINIQ2, LTRI, LUPDQ1,
-     $                   LUPDQ2
+     $                   LUPDQ2, UNREL
       CHARACTER*16       CMPQ, CMPSC
-      INTEGER            I, IMAT, IWARN, IWRK, J, K, M, MJ1, MJ2, MJ3,
-     $                   MK1, MK2, MK3, MM, OPTDW
-      DOUBLE PRECISION   BASE, CO, EMAX, EMIN, MU, NU, PREC, SI, TMP1,
-     $                   TMP2
+      INTEGER            EMAX, EMIN, I, I11, I22, I2X2, IMAT, IW, IWARN,
+     $                   IWRK, J, K, L, M, MJ1, MJ2, MJ3, MK1, MK2, MK3,
+     $                   MM, NBETA0, NINF, OPTDW, P
+      DOUBLE PRECISION   BASE, CO, MU, NU, SI, TEMP, TMP1, TMP2
       COMPLEX*16         EIG
 C
 C     .. Local Arrays ..
       INTEGER            IDUM( 1 )
-      DOUBLE PRECISION   DUM( 1 )
+      DOUBLE PRECISION   DUM( 4 )
 C
 C     .. External Functions ..
       LOGICAL            LSAME
-      DOUBLE PRECISION   DDOT, DLAMCH, DLAPY2
-      EXTERNAL           DDOT, DLAMCH, DLAPY2, LSAME
+      INTEGER            MA02OD
+      DOUBLE PRECISION   DDOT, DLAMCH, DLANTR, DLAPY2
+      EXTERNAL           DDOT, DLAMCH, DLANTR, DLAPY2, LSAME, MA02OD
 C
 C     .. External Subroutines ..
       EXTERNAL           DAXPY, DCOPY, DGEMM, DLACPY, DLARF, DLARFG,
      $                   DLARTG, DLASET, DROT, DSYMV, DSYR2, MA02AD,
-     $                   MB01LD, MB01MD, MB01ND, MB03BD, XERBLA
+     $                   MA02PD, MB01LD, MB01MD, MB01ND, MB03BD, XERBLA
 C
-C     ... Intrinsic Functions ..
+C     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, DCMPLX, DIMAG, INT, MAX, MIN, MOD,
      $                   SQRT
 C
@@ -381,11 +410,6 @@ C
       LUPDQ2 = LSAME( COMPQ2, 'U' )
       LCMPQ1 = LUPDQ1 .OR. LINIQ1
       LCMPQ2 = LUPDQ2 .OR. LINIQ2
-      IF( LTRI .OR. LCMPQ1 .OR. LCMPQ2 ) THEN
-         OPTDW = 8*MM + MAX( N, 32 )
-      ELSE
-         OPTDW = 4*MM + MAX( N, 32 )
-      END IF
 C
 C     Test the input arguments.
 C
@@ -419,12 +443,24 @@ C
          INFO = -20
       ELSE IF( LDC2.LT.MAX( 1, M ) ) THEN
          INFO = -22
-      ELSE IF( LIWORK.LT.M+12 ) THEN
+      ELSE IF( LIWORK.LT.N+12 ) THEN
          INFO = -27
-      ELSE IF( LDWORK.LT.OPTDW ) THEN
-         INFO = -29
+      ELSE
+         IF( MOD( M, 2 ).EQ.0 ) THEN
+            I = MAX( 4*N, 32 ) + 4
+         ELSE
+            I = MAX( 4*N, 36 )
+         END IF
+         IF( LTRI .OR. LCMPQ1 .OR. LCMPQ2 ) THEN
+            OPTDW = 8*MM + I
+         ELSE
+            OPTDW = 4*MM + I
+         END IF
+         IF( LDWORK.LT.OPTDW )
+     $      INFO = -29
       END IF
-      IF( INFO.NE.0) THEN
+C
+      IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'MB04BD', -INFO )
          RETURN
       END IF
@@ -432,16 +468,61 @@ C
 C     Quick return if possible.
 C
       IF( N.EQ.0 ) THEN
-         DWORK( 1 ) = ONE
+         IWORK( 1 ) = 0
+         DWORK( 1 ) = FIVE
+         DWORK( 2 ) = ZERO
+         DWORK( 3 ) = ZERO
+         DWORK( 4 ) = ZERO
+         DWORK( 5 ) = ZERO
          RETURN
       END IF
 C
 C     Determine machine constants.
 C
       BASE = DLAMCH( 'Base' )
-      EMIN = DLAMCH( 'Minimum Exponent' )
-      EMAX = DLAMCH( 'Largest Exponent' )
-      PREC = DLAMCH( 'Precision' )
+      EMIN = INT( DLAMCH( 'Minimum Exponent' ) )
+      EMAX = INT( DLAMCH( 'Largest Exponent' ) )
+C
+C     Find half of the number of infinite eigenvalues if S is diagonal.
+C     Otherwise, find a lower bound of this number.
+C
+      NINF = 0
+      IF( M.EQ.1 ) THEN
+         TEMP = ZERO
+      ELSE
+         TEMP = DLANTR( 'Max', 'Lower', 'No-diag', M-1, M-1, DE( 2, 1 ),
+     $                  LDDE, DWORK ) +
+     $          DLANTR( 'Max', 'Upper', 'No-diag', M-1, M-1, DE( 1, 3 ),
+     $                  LDDE, DWORK )
+      END IF
+      IF( TEMP.EQ.ZERO ) THEN
+         IF( M.EQ.1 ) THEN
+            IF( A( 1, 1 ).EQ.ZERO )
+     $         NINF = 1
+         ELSE
+            IF( DLANTR( 'Max', 'Lower', 'No-diag', M-1, M-1, A( 2, 1 ),
+     $                                   LDA, DWORK ).EQ.ZERO .AND.
+     $          DLANTR( 'Max', 'Upper', 'No-diag', M-1, M-1, A( 1, 2 ),
+     $                                   LDA, DWORK ).EQ.ZERO ) THEN
+               DO 10 J = 1, M
+                  IF( A( J, J ).EQ.ZERO )
+     $               NINF = NINF + 1
+   10          CONTINUE
+            ELSE
+               CALL MA02PD( M, M, A, LDA, I, J )
+               NINF = MAX( I, J )/2
+            END IF
+         END IF
+      ELSE
+C
+C        Incrementing NINF below is due to even multiplicity of
+C        eigenvalues for real skew-Hamiltonian matrices.
+C
+         NINF = MA02OD( 'Skew', M, A, LDA, DE, LDDE )
+         IF( MOD( NINF, 2 ).GT.0 )
+     $      NINF = NINF + 1
+         NINF = NINF/2
+      END IF
 C
 C     STEP 1: Reduce S to skew-Hamiltonian triangular form.
 C
@@ -450,7 +531,7 @@ C
 C
       DUM( 1 ) = ZERO
 C
-      DO 10 K = 1, M - 1
+      DO 20 K = 1, M - 1
 C
 C        Generate elementary reflector H(k) = I - nu * v * v' to
 C        annihilate E(k+2:m,k).
@@ -595,7 +676,7 @@ C
             CALL MB01ND( 'Upper', M-K+1, ONE, A( K, K ), 1, DWORK, 1,
      $                   DE( K, K+1 ), LDDE )
 C
-C           Apply P(k) from the left hand side to C1(k:m,k+1:m).
+C           Apply P(k) from the left hand side to C1(k:m,1:m).
 C
             CALL DLARF( 'Left', M-K+1, M, A( K, K ), 1, NU, C1( K, 1 ),
      $                  LDC1, DWORK )
@@ -636,7 +717,7 @@ C
 C        Set A(k+1:m,k) to zero in order to be able to apply MB03BD.
 C
          CALL DCOPY( M-K, DUM, 0, A( K+1, K ), 1 )
-   10 CONTINUE
+   20 CONTINUE
 C
 C     The following operations do not preserve the Hamiltonian structure
 C     of H. -C1 is copied to C2. The lower triangular part of W(1:m,1:m)
@@ -647,11 +728,11 @@ C
       CALL DLACPY( 'Full', M, M, A, LDA, B, LDB )
       CALL DLACPY( 'Upper', M, M, DE( 1, 2 ), LDDE, F, LDF )
 C
-      DO 30 J = 1, M
-         DO 20 I = 1, M
+      DO 40 J = 1, M
+         DO 30 I = 1, M
             C2( I, J ) = -C1( I, J )
-   20    CONTINUE
-   30 CONTINUE
+   30    CONTINUE
+   40 CONTINUE
 C
       CALL DLACPY( 'Lower', M, M, VW, LDVW, DWORK, M )
       CALL MA02AD( 'Lower', M, M, VW, LDVW, DWORK, M )
@@ -661,29 +742,29 @@ C
       IF ( LCMPQ2 ) THEN
          CALL DLACPY( 'Full', M, M, Q1( M+1, M+1 ), LDQ1, Q2, LDQ2 )
 C
-         DO 50 J = 1, M
-            DO 40 I = M + 1, N
+         DO 60 J = 1, M
+            DO 50 I = M + 1, N
                Q2( I, J ) = -Q1( I-M, J+M )
-   40       CONTINUE
-   50    CONTINUE
+   50       CONTINUE
+   60    CONTINUE
 C
-         DO 70 J = M + 1, N
-            DO 60 I = 1, M
+         DO 80 J = M + 1, N
+            DO 70 I = 1, M
                Q2( I, J ) = -Q1( I+M, J-M )
-   60       CONTINUE
-   70    CONTINUE
+   70       CONTINUE
+   80    CONTINUE
 C
          CALL DLACPY( 'Full', M, M, Q1, LDQ1, Q2( M+1, M+1 ), LDQ2 )
       END IF
 C
 C     STEP 2: Eliminations in H.
 C
-      DO 120 K = 1, M
+      DO 130 K = 1, M
          MK1 = MIN( K+1, M )
 C
 C        I. Annihilate W(k:m-1,k).
 C
-         DO 80 J = K, M - 1
+         DO 90 J = K, M - 1
             MJ3  = MIN( J+3, M+1 )
 C
 C           Determine a Givens rotation to annihilate W(j,k) from the
@@ -740,7 +821,7 @@ C              Update Q1.
 C
                CALL DROT( N, Q1( 1, J ), 1, Q1( 1, J+1 ), 1, CO, SI )
             END IF
-   80    CONTINUE
+   90    CONTINUE
 C
 C        II. Annihilate W(m,k).
 C
@@ -768,7 +849,7 @@ C
 C
 C        III. Annihilate C1(k+1:m,k).
 C
-         DO 90 J = M, K + 1, -1
+         DO 100 J = M, K + 1, -1
             MJ2  = MIN( J+2, M+1 )
 C
 C           Determine a Givens rotation to annihilate C1(j,k) from the
@@ -824,11 +905,11 @@ C
                CALL DROT( N, Q1( 1, M+J ), 1, Q1( 1, M+J-1 ), 1, CO, SI
      $                     )
             END IF
-   90    CONTINUE
+  100    CONTINUE
 C
 C        IV. Annihilate W(k,k+1:m-1).
 C
-         DO 100 J = K + 1, M - 1
+         DO 110 J = K + 1, M - 1
             MJ2  = MIN( J+2, M )
 C
 C           Determine a Givens rotation to annihilate W(k,j) from the
@@ -885,7 +966,7 @@ C
                CALL DROT( N, Q2( 1, M+J ), 1, Q2( 1, M+J+1 ), 1, CO, SI
      $                     )
             END IF
-  100    CONTINUE
+  110    CONTINUE
 C
 C        V. Annihilate W(k,m).
 C
@@ -942,7 +1023,7 @@ C
 C
 C        VI. Annihilate C2(k+2:m,k).
 C
-         DO 110 J = M, K + 2, -1
+         DO 120 J = M, K + 2, -1
             MJ1 = MIN( J+1, M )
 C
 C           Determine a Givens rotation to annihilate C2(j,k) from the
@@ -997,8 +1078,8 @@ C              Update Q2.
 C
                CALL DROT( N, Q2( 1, J ), 1, Q2( 1, J-1 ), 1, CO, SI )
             END IF
-  110    CONTINUE
-  120 CONTINUE
+  120    CONTINUE
+  130 CONTINUE
 C
 C                     (  A1  D1  )      (  B1  F1  )      (  C11  V1  )
 C     Now we have S = (          ), T = (          ), H = (           ),
@@ -1043,55 +1124,185 @@ C
       IWORK( 4 ) = -1
 C
 C     Apply periodic QZ algorithm.
-C     Workspace:    need   OPTDW;
-C                   prefer larger.
+C     Workspace:    need   IWRK + MAX( N, 32 ) + 3.
 C
       CALL MB03BD( CMPSC, 'Careful', CMPQ, IDUM, 4, M, 1, 1, M, IWORK,
      $             DWORK( IMAT ), M, M, DWORK, M, M, ALPHAR, ALPHAI,
      $             BETA, IWORK( 5 ), IWORK( M+5 ), LIWORK-( M+4 ),
      $             DWORK( IWRK ), LDWORK-IWRK+1, IWARN, INFO )
-      IF( IWARN.GT.0 ) THEN
+C
+      IF( IWARN.GT.0 .AND. IWARN.LT.M ) THEN
          INFO = 1
          RETURN
+      ELSE IF( IWARN.EQ.M+1 ) THEN
+         INFO = 3
       ELSE IF( INFO.GT.0 ) THEN
          INFO = 2
          RETURN
       END IF
-      OPTDW = MAX( OPTDW, INT( DWORK( IWRK ) ) + IWRK - 1 )
+      OPTDW  = MAX( OPTDW, INT( DWORK( IWRK ) ) + IWRK - 1 )
+      NBETA0 = 0
+      I11    = 0
+      I22    = 0
+      I2X2   = 0
 C
 C     Compute the eigenvalues with nonnegative imaginary parts of the
-C     pencil aS - bH.
+C     pencil aS - bH. Also, count the number of 2-by-2 diagonal blocks,
+C     I2X2, and the number of 1-by-1 and 2-by-2 blocks with unreliable
+C     eigenvalues, I11 and I22, respectively.
 C
-      DO 130 I = 1, M
+      I = 1
+C     WHILE( I.LE.M ) DO
+  140 CONTINUE
+      IF( I.LE.M ) THEN
+         IF( NINF.GT.0 ) THEN
+            IF( BETA( I ).EQ.ZERO )
+     $         NBETA0 = NBETA0 + 1
+         END IF
          IF( IWORK( I+4 ).GE.2*EMIN .AND. IWORK( I+4 ).LE.2*EMAX ) THEN
 C
 C           B = SQRT(BASE**IWORK(i+4)) is between underflow and overflow
 C           threshold, BETA(i) is divided by B.
-C           Set to zero negligible real and imaginary parts.
 C
             BETA( I ) = BETA( I )/BASE**( HALF*IWORK( I+4 ) )
-            EIG = SQRT( DCMPLX( ALPHAR( I ), ALPHAI( I ) ) )
-            ALPHAR( I ) = DIMAG( EIG )
-            ALPHAI( I ) = DBLE(  EIG )
-            TMP2 = PREC*DLAPY2( ALPHAR( I ), ALPHAI( I ) )
-            IF( ABS( ALPHAR( I ) ).LT.TMP2 ) THEN
-               ALPHAR( I ) = ZERO
-               IF( ALPHAI( I ).LT.ZERO )
-     $             ALPHAI( I ) = -ALPHAI( I )
-            END IF
-            IF( ABS( ALPHAI( I ) ).LT.TMP2 ) THEN
-               ALPHAI( I ) = ZERO
+            IF( BETA( I ).NE.ZERO ) THEN
+               IF( IWORK( M+I+5 ).LT.0 ) THEN
+                  I22 = I22 + 1
+               ELSE IF( IWORK( M+I+5 ).GT.0 ) THEN
+                  I11 = I11 + 1
+               END IF
+               EIG = SQRT( DCMPLX( ALPHAR( I ), ALPHAI( I ) ) )
+               ALPHAR( I ) = DIMAG( EIG )
+               ALPHAI( I ) = DBLE(  EIG )
                IF( ALPHAR( I ).LT.ZERO )
      $             ALPHAR( I ) = -ALPHAR( I )
+               IF( ALPHAI( I ).LT.ZERO )
+     $             ALPHAI( I ) = -ALPHAI( I )
+               IF( ALPHAR( I ).NE.ZERO .AND. ALPHAI( I ).NE.ZERO ) THEN
+                  ALPHAR( I+1 ) = -ALPHAR( I )
+                  ALPHAI( I+1 ) =  ALPHAI( I )
+                  BETA(   I+1 ) =  BETA(   I )
+                  I2X2 = I2X2 + 1
+                  I    = I    + 1
+               ELSE IF( IWORK( M+I+5 ).LT.0 ) THEN
+                  I2X2 = I2X2 + 1
+               END IF
             END IF
+         ELSE IF( IWORK( I+4 ).LT.2*EMIN ) THEN
+C
+C           Set to zero the numerator part of the eigenvalue.
+C
+            ALPHAR( I ) = ZERO
+            ALPHAI( I ) = ZERO
+            I11 = I11 + 1
          ELSE
 C
-C           Error.
+C           Set an infinite eigenvalue.
 C
-            INFO = 1
-            RETURN
+            IF( NINF.GT.0 )
+     $         NBETA0 = NBETA0 + 1
+            BETA( I ) = ZERO
+            I11 = I11 + 1
          END IF
-  130 CONTINUE
+         I = I + 1
+         GO TO 140
+      END IF
+C     END WHILE 140
+C
+      IWORK( 1 ) = I11 + I22
+C
+C     Set to infinity the largest eigenvalues, if necessary.
+C
+      L = 0
+      IF( NINF.GT.0 ) THEN
+         DO 160  J = 1, NINF - NBETA0
+            TMP1 = ZERO
+            TMP2 = ONE
+            P    = 1
+            DO 150 I = 1, M
+               IF( BETA( I ).GT.ZERO ) THEN
+                  TEMP = DLAPY2( ALPHAR( I ), ALPHAI( I ) )
+                  IF( TEMP.GT.TMP1 .AND. TMP2.GE.BETA( I ) ) THEN
+                     TMP1 = TEMP
+                     TMP2 = BETA( I )
+                     P    = I
+                  END IF
+               END IF
+  150       CONTINUE
+            L = L + 1
+            BETA( P ) = ZERO
+  160    CONTINUE
+C
+         IF( L.EQ.IWORK( 1 ) ) THEN
+C
+C           All unreliable eigenvalues found have been set to infinity.
+C
+            INFO = 0
+            I11  = 0
+            I22  = 0
+            IWORK( 1 ) = 0
+         END IF
+      END IF
+C
+C     Save the norms of the factors.
+C
+      CALL DCOPY( 4, DWORK( IWRK+1 ), 1, DUM, 1 )
+C
+C     Save the quadruples of the 1-by-1 and 2-by-2 diagonal blocks.
+C     All 1-by-1 diagonal blocks come first.
+C     Save also information about blocks with possible loss of accuracy.
+C
+C     Workspace:  IWRK+w-1, where w = 4 if M = 1, or w = 4*N, otherwise.
+C
+      K  = IWRK
+      IW = IWORK( 1 )
+      I  = 1
+      J  = 1
+      L  = 4*( M - 2*I2X2 ) + K
+C
+C     WHILE( I.LE.N ) DO
+      UNREL = .FALSE.
+  170 CONTINUE
+      IF( I.LE.M ) THEN
+         IF( J.LE.IW )
+     $      UNREL = I.EQ.ABS( IWORK( M+I+5 ) )
+         IF(   ALPHAR( I ).NE.ZERO .AND. BETA( I ).NE.ZERO .AND.
+     $       ( ALPHAI( I ).NE.ZERO .OR. IWORK( M+I+5 ).LT.0 ) ) THEN
+            IF( UNREL ) THEN
+               J = J + 1
+               IWORK( J )    = IWORK( M+I+5 )
+               IWORK( IW+J ) = L - IWRK + 6
+               UNREL = .FALSE.
+            END IF
+            CALL DLACPY( 'Full', 2, 2, DWORK( IMAT+(M+1)*(I-1) ), M,
+     $                   DWORK( L ), 2 )
+            CALL DLACPY( 'Full', 2, 2, DWORK( IMAT+(M+1)*(I-1)+MM ), M,
+     $                   DWORK( L+4 ), 2 )
+            CALL DLACPY( 'Full', 2, 2, DWORK( IMAT+(M+1)*(I-1)+2*MM ),
+     $                   M, DWORK( L+8 ), 2 )
+            CALL DLACPY( 'Full', 2, 2, DWORK( IMAT+(M+1)*(I-1)+3*MM ),
+     $                   M, DWORK( L+12 ), 2 )
+            L = L + 16
+            I = I + 2
+         ELSE
+            IF ( UNREL ) THEN
+               J = J + 1
+               IWORK( J )    = I
+               IWORK( IW+J ) = K - IWRK + 6
+               UNREL = .FALSE.
+            END IF
+            CALL DCOPY( 4, DWORK( IMAT+(M+1)*(I-1) ), MM, DWORK( K ),
+     $                  1 )
+            K = K + 4
+            I = I + 1
+         END IF
+         GO TO 170
+      END IF
+C     END WHILE 170
+C
+      IWORK( 2*IW+2 ) = I11
+      IWORK( 2*IW+3 ) = I22
+      IWORK( 2*IW+4 ) = I2X2
 C
       IF( LTRI ) THEN
 C
@@ -1117,7 +1328,7 @@ C        Skew-symmetric update of D.
 C
          CALL MB01LD( 'Upper', 'Transpose', M, M, ZERO, ONE, DE( 1, 2 ),
      $                LDDE, DWORK( 2*MM+1 ), M, DE( 1, 2 ), LDDE,
-     $                DWORK( IMAT ), LDWORK-IMAT+1, INFO )
+     $                DWORK( IMAT ), LDWORK-IMAT+1, IW )
 C
 C        Update B.
 C
@@ -1127,7 +1338,7 @@ C        Skew-symmetric update of F.
 C
          CALL MB01LD( 'Upper', 'Transpose', M, M, ZERO, ONE, F, LDF,
      $                DWORK, M, F, LDF, DWORK( IMAT ), LDWORK-IMAT+1,
-     $                INFO )
+     $                IW )
 C
          IF( LCMPQ1 ) THEN
 C
@@ -1159,6 +1370,13 @@ C
      $                   LDQ2 )
          END IF
       END IF
+C
+C     Move the norms, and the quadruples of 1-by-1 and 2-by-2 blocks
+C     in front.
+C
+      K = 4*( M - 2*I2X2 ) + 16*I2X2
+      CALL DCOPY( K, DWORK( IWRK ), 1, DWORK( 6 ), 1 )
+      CALL DCOPY( 4, DUM, 1, DWORK( 2 ), 1 )
 C
       DWORK( 1 ) = OPTDW
       RETURN

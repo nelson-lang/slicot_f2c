@@ -1,23 +1,5 @@
       SUBROUTINE MA01BD( BASE, LGBAS, K, S, A, INCA, ALPHA, BETA, SCAL )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the general product of K real scalars without over-
@@ -67,6 +49,7 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Romania,
 C     July 2009, SLICOT Library version of the routine PLAPR1.
+C     V. Sima, Aug. 2011, Apr. 2020.
 C
 C     KEYWORDS
 C
@@ -99,7 +82,9 @@ C
          TEMP = A( 1 + ( I - 1 )*INCA )
          IF ( TEMP.NE.ZERO ) THEN
             SL   = INT( LOG( ABS( TEMP ) ) / LGBAS )
-            TEMP = TEMP / ( BASE**DBLE( SL ) )
+            TEMP = TEMP / BASE / ( BASE**DBLE( SL-1 ) )
+         ELSE
+            SL   = 0
          END IF
          IF ( S(I).EQ.1 ) THEN
             ALPHA = ALPHA * TEMP
@@ -112,12 +97,12 @@ C
             IF ( ALPHA.NE.ZERO ) THEN
                SL    = INT( LOG( ABS( ALPHA ) ) / LGBAS )
                SCAL  = SCAL + SL
-               ALPHA = ALPHA / ( BASE**DBLE( SL ) )
+               ALPHA = ALPHA / BASE / ( BASE**DBLE( SL-1 ) )
             END IF
             IF ( BETA.NE.ZERO ) THEN
                SL   = INT( LOG( ABS( BETA ) ) / LGBAS )
                SCAL = SCAL - SL
-               BETA = BETA / ( BASE**DBLE( SL ) )
+               BETA = BETA / BASE / ( BASE**DBLE( SL-1 ) )
             END IF
          END IF
    10 CONTINUE
@@ -130,7 +115,7 @@ C
          SCAL = 0
       ELSE
          SL    = INT( LOG( ABS( ALPHA ) ) / LGBAS )
-         ALPHA = ALPHA / ( BASE**DBLE( SL ) )
+         ALPHA = ALPHA / BASE / ( BASE**DBLE( SL-1 ) )
          SCAL  = SCAL + SL
       END IF
 C

@@ -2,24 +2,6 @@
      $                   L, NSMP, U, LDU, Y, LDY, N, R, LDR, SV, RCOND,
      $                   TOL, IWORK, DWORK, LDWORK, IWARN, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To preprocess the input-output data for estimating the matrices
@@ -232,9 +214,21 @@ C
 C     Workspace
 C
 C     IWORK   INTEGER array, dimension (LIWORK)
-C             LIWORK >= (M+L)*NOBR, if METH = 'N';
-C             LIWORK >= M+L, if METH = 'M' and ALG = 'F';
-C             LIWORK >= 0,   if METH = 'M' and ALG = 'C' or 'Q'.
+C             LIWORK >= MAX(3,(M+L)*NOBR), if METH = 'N';
+C             LIWORK >= MAX(3,M+L), if METH = 'M' and ALG = 'F';
+C             LIWORK >= 3,   if METH = 'M' and ALG = 'C' or 'Q'.
+C             On entry with  BATCH = 'I'  or  BATCH = 'L',  IWORK(1:3)
+C             must contain the values of ICYCLE, MAXWRK, and NSMPSM
+C             set by the previous call of this routine.
+C             On exit with  BATCH = 'F'  or  BATCH = 'I',  IWORK(1:3)
+C             contains the values of ICYCLE, MAXWRK, and NSMPSM to be
+C             used by the next call of the routine.
+C             ICYCLE  counts the cycles for  BATCH = 'I'.
+C             MAXWRK  stores the current optimal workspace.
+C             NSMPSM  sums up the  NSMP  values for  BATCH <> 'O'.
+C             The first three elements of  IWORK  should be preserved
+C             during successive calls of the routine with  BATCH = 'F'
+C             or  BATCH = 'I',  till the final call with   BATCH = 'L'.
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if  INFO = 0,  DWORK(1) returns the optimal value
@@ -450,7 +444,7 @@ C     V. Sima, Katholieke Universiteit Leuven, Feb. 2000.
 C
 C     REVISIONS
 C
-C     August 2000, March 2005.
+C     August 2000, March 2005, May 2020.
 C
 C     KEYWORDS
 C
@@ -470,8 +464,8 @@ C     .. Array Arguments ..
       DOUBLE PRECISION   DWORK(*), R(LDR, *), SV(*), U(LDU, *),
      $                   Y(LDY, *)
 C     .. Local Scalars ..
-      INTEGER            IWARNL, LMNOBR, LNOBR, MAXWRK, MINWRK, MNOBR,
-     $                   NOBR21, NR, NS, NSMPSM
+      INTEGER            ICYCLE, IWARNL, LMNOBR, LNOBR, MAXWRK, MINWRK,
+     $                   MNOBR, NOBR21, NR, NS, NSMPSM
       LOGICAL            CHALG, CONNEC, CONTRL, FIRST, FQRALG, INTERM,
      $                   JOBDM, LAST, MOESP, N4SID, ONEBCH, QRALG
 C     .. External Functions ..
@@ -481,10 +475,6 @@ C     .. External Subroutines ..
       EXTERNAL           IB01MD, IB01ND, IB01OD, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC          MAX
-C     .. Save Statement ..
-C        MAXWRK  is used to store the optimal workspace.
-C        NSMPSM  is used to sum up the  NSMP  values for  BATCH <> 'O'.
-      SAVE               MAXWRK, NSMPSM
 C     ..
 C     .. Executable Statements ..
 C
@@ -516,8 +506,13 @@ C
       IWARN  = 0
       INFO   = 0
       IF( FIRST ) THEN
+         ICYCLE = 1
          MAXWRK = 1
          NSMPSM = 0
+      ELSE IF( .NOT.ONEBCH ) THEN
+         ICYCLE = IWORK(1)
+         MAXWRK = IWORK(2)
+         NSMPSM = IWORK(3)
       END IF
       NSMPSM = NSMPSM + NSMP
 C
@@ -622,6 +617,11 @@ C
 C     Return if there are illegal arguments.
 C
       IF( INFO.NE.0 ) THEN
+         IF( .NOT.ONEBCH ) THEN
+            IWORK(1) = 1
+            IWORK(2) = MAXWRK
+            IWORK(3) = 0
+         END IF
          CALL XERBLA( 'IB01AD', -INFO )
          RETURN
       END IF
@@ -649,6 +649,10 @@ C
 C
 C        Return to get new data.
 C
+         ICYCLE = ICYCLE + 1
+         IWORK(1) = ICYCLE
+         IWORK(2) = MAXWRK
+         IWORK(3) = NSMPSM
          RETURN
       END IF
 C
@@ -680,6 +684,11 @@ C
 C     Return optimal workspace in  DWORK(1).
 C
       DWORK( 1 ) = MAX( MAXWRK,  INT( DWORK( 1 ) ) )
+      IF( .NOT.ONEBCH ) THEN
+         IWORK(1) = ICYCLE
+         IWORK(2) = MAXWRK
+         IWORK(3) = NSMPSM
+      END IF
       RETURN
 C
 C *** Last line of IB01AD ***

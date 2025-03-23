@@ -2,24 +2,6 @@
      $                   SELECT, T, LDT, IXT, Q, LDQ, IXQ, M, TOL,
      $                   IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To reorder the diagonal blocks of the formal matrix product
@@ -242,7 +224,7 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Romania,
 C     Mar. 2010, SLICOT Library version of the PEP routine PEP_DTGSEN.
-C     V. Sima, July, 2010.
+C     V. Sima, July, 2010, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -269,8 +251,8 @@ C     ..
 C     .. Local Scalars ..
       CHARACTER          COMPQC
       LOGICAL            INITQ, PAIR, SPECQ, SWAP, WANTQ, WANTQL, WS
-      INTEGER            I, IP1, IT, L, LL, LS, MAXN, MINK, MINN,
-     $                   MINSUM, MNWORK, NKP1, SUMD
+      INTEGER            I, IP1, IT, L, LL, LS, MAXN, MINN, MINSUM,
+     $                   MNWORK, NKP1, SUMD
 C     ..
 C     .. Local Arrays ..
       DOUBLE PRECISION   TOLA( 3 )
@@ -326,9 +308,8 @@ C     At the same time the sequence of consecutive sums of dimension
 C     differences is formed and its minimum is determined.
 C     Also, the maximum of all dimensions is computed.
 C
+      SUMD = 0
       IF( INFO.EQ.0 ) THEN
-         SUMD   = 0
-         MINK   = K
          MINSUM = 0
          MAXN   = 0
          MINN   = N(K)
@@ -341,10 +322,8 @@ C
      $         INFO = -7
             IF ( S(L).EQ.-1 )
      $         SUMD = SUMD + ( NKP1 - N(L) )
-            IF ( SUMD.LT.MINSUM ) THEN
-               MINSUM = SUMD
-               MINK = L
-            END IF
+            IF ( SUMD.LT.MINSUM )
+     $         MINSUM = SUMD
             MAXN = MAX( MAXN, N(L) )
 C
 C           Check the condition N(l) >= NI(l) + NC >= 0.
@@ -460,11 +439,11 @@ C
 C
 C     Quick return if possible.
 C
-      IF( LDWORK.EQ.-1 ) THEN
-         DWORK(1) = DBLE( MNWORK )
-         RETURN
-      ELSE IF( INFO.LT.0 ) THEN
+      IF( INFO.LT.0 ) THEN
          CALL XERBLA( 'MB03KD', -INFO )
+         RETURN
+      ELSE IF( LDWORK.EQ.-1 ) THEN
+         DWORK(1) = DBLE( MNWORK )
          RETURN
       END IF
 C

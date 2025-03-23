@@ -2,24 +2,6 @@
      $                   LDA, T, LDT, U, LDU, C, LDC, X, LDX, SEPD,
      $                   RCOND, FERR, IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To estimate the conditioning and compute an error bound on the
@@ -190,6 +172,12 @@ C             LDWORK >= MAX(3,2*N*N) + N*N + 2*N,     if JOB  = 'E', or
 C                                                        JOB  = 'B'.
 C             For optimum performance LDWORK should sometimes be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -257,7 +245,7 @@ C     V. Sima, Katholieke Univ. Leuven, Belgium, February 1999.
 C
 C     REVISIONS
 C
-C     V. Sima, Katholieke Univ. Leuven, Belgium, March 2003.
+C     V. Sima, Katholieke Univ. Leuven, Belgium, March 2003, July 2012.
 C
 C     KEYWORDS
 C
@@ -280,8 +268,8 @@ C     .. Array Arguments ..
      $                   T( LDT, * ), U( LDU, * ), X( LDX, * )
 C     ..
 C     .. Local Scalars ..
-      LOGICAL            JOBB, JOBC, JOBE, LOWER, NOFACT, NOTRNA,
-     $                   UPDATE
+      LOGICAL            JOBB, JOBC, JOBE, LOWER, LQUERY, NOFACT,
+     $                   NOTRNA, UPDATE
       CHARACTER          SJOB, TRANAT
       INTEGER            I, IABS, IRES, IWRK, IXMA, J, LDW, NN, SDIM,
      $                   WRKOPT
@@ -346,15 +334,44 @@ C
          INFO = -15
       ELSE IF( LDX.LT.MAX( 1, N ) ) THEN
          INFO = -17
-      ELSE IF( LDWORK.LT.1 .OR.
-     $       ( LDWORK.LT.LDW .AND. JOBC  .AND. .NOT.NOFACT ) .OR.
-     $       ( LDWORK.LT.MAX( LDW, 5*N ) .AND. JOBC .AND. NOFACT ) .OR.
-     $       ( LDWORK.LT.( LDW + 2*N )   .AND. .NOT.JOBC ) ) THEN
-         INFO = -23
+      ELSE
+         IF( JOBC ) THEN
+            IF( NOFACT ) THEN
+               IWRK = MAX( LDW, 5*N )
+            ELSE
+               IWRK = LDW
+            END IF
+         ELSE
+            IWRK = LDW + 2*N
+         END IF
+         IWRK = MAX( 1, IWRK )
+         LQUERY = LDWORK.EQ.-1
+         IF( NOFACT ) THEN
+            IF( UPDATE ) THEN
+               SJOB = 'V'
+            ELSE
+               SJOB = 'N'
+            END IF
+         END IF
+         IF( LQUERY ) THEN
+            IF( NOFACT ) THEN
+               CALL DGEES( SJOB, 'Not ordered', SELECT, N, T, LDT, SDIM,
+     $                     DWORK, DWORK, U, LDU, DWORK, -1, BWORK,
+     $                     INFO )
+               WRKOPT = MAX( IWRK, INT( DWORK( 1 ) ) + 2*N )
+            ELSE
+               WRKOPT = IWRK
+            END IF
+         END IF
+         IF( LDWORK.LT.IWRK .AND. .NOT. LQUERY )
+     $      INFO = -23
       END IF
 C
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'SB03SD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK( 1 ) = WRKOPT
          RETURN
       END IF
 C
@@ -473,11 +490,6 @@ C        minimal amount of real workspace needed at that point in the
 C        code, as well as the preferred amount for good performance.)
 C
          CALL DLACPY( 'Full', N, N, A, LDA, T, LDT )
-         IF( UPDATE ) THEN
-            SJOB = 'V'
-         ELSE
-            SJOB = 'N'
-         END IF
          CALL DGEES( SJOB, 'Not ordered', SELECT, N, T, LDT, SDIM,
      $               DWORK( 1 ), DWORK( N+1 ), U, LDU, DWORK( 2*N+1 ),
      $               LDWORK-2*N, BWORK, INFO )

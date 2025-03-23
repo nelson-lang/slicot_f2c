@@ -2,24 +2,6 @@
      $                   N, NI, S, T, LDT, IXT, Q, LDQ, IXQ, TOL, IWORK,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To reorder the diagonal blocks of the formal matrix product
@@ -234,7 +216,7 @@ C     PEP_DLAEXC, by R. Granat, Umea University, Sweden, Apr. 2008.
 C
 C     REVISIONS
 C
-C     V. Sima, Apr. 2010, May 2010, July 2010.
+C     V. Sima, Apr. 2010, May 2010, July 2010, Aug. 2011, June 2014.
 C
 C     KEYWORDS
 C
@@ -263,9 +245,9 @@ C     .. Local Scalars ..
      $                   II, INDF1, INDF2, INDTAU, INDTT, INDV1, INDV2,
      $                   INDVF, INDVP1, INDXC, INDXV, IP1, IPP, IQ, IS,
      $                   IT, IT2, ITAU1, ITAU2, ITAUF, ITAUF1, ITAUF2,
-     $                   ITAUP1, IV1P1, IV2P1, J2, J3, J4, L, LTAU,
-     $                   LTAU1, LTAU2, LTT, MINWRK, MN, ND, ND2, TAU,
-     $                   TAU1, TAU1P1, TAU2, TAU2P1, TT, V, V1, V2,
+     $                   ITAUP1, IV1P1, IV2P1, J2, J3, J4, L, LDWKE,
+     $                   LTAU, LTAU1, LTAU2, LTT, MINWRK, MN, ND, ND2,
+     $                   TAU, TAU1, TAU1P1, TAU2, TAU2P1, TT, V, V1, V2,
      $                   VLOC, VLOC1, VLOC2, W, WE
       DOUBLE PRECISION   DNRM, DTAU1, DTAU2, EPS, SCALOC, SMLNUM,
      $                   STRONG, TAULOC, THRESH, TMP, TMP1, TMP2, V_1,
@@ -288,18 +270,45 @@ C     .. Intrinsic Functions ..
 C     ..
 C     .. Executable Statements ..
 C
-C     Decode the input parameters
-C
-      INFO  = 0
-      WANTQ = LSAME( COMPQ, 'U' )
-      SPECQ = LSAME( COMPQ, 'W' )
+C     For efficiency reasons, the parameters are not checked.
 C
 C     Set the machine-dependent parameters.
 C
+      IF( LDWORK.EQ.-1 ) THEN
+C
+C        Compute the workspace size.
+C
+         MN = 0
+C
+         DO 5 I = 1, K
+            MN = MAX( MN, N( I ) )
+    5    CONTINUE
+C
+         IF( MN.LE.10 )
+     $       MN = 0
+C
+         IF( N1.EQ.1 .AND. N2.EQ.1 ) THEN
+            WE = K * 3
+            MN = K * 10 + MN
+         ELSE IF( N1.EQ.1 .AND. N2.EQ.2 ) THEN
+            WE = K * 7
+            MN = K * 25 + MN
+         ELSE IF( N1.EQ.2 .AND. N2.EQ.1 ) THEN
+            WE = K * 7
+            MN = K * 23 + MN
+         ELSE IF( N1.EQ.2 .AND. N2.EQ.2 ) THEN
+            WE = K * 12
+            MN = K * 42 + MN
+         END IF
+C
+         CALL MB03KE( .FALSE., .FALSE., -1, K, N1, N2, EPS, SMLNUM, S,
+     $                T, T, T, SCALOC, DWORK, -1, INFO )
+         DWORK( 1 ) = MAX( INT( DWORK( 1 ) ) + WE, MN )
+         RETURN
+      END IF
+C
       EPS    = TOL( 2 )
       SMLNUM = TOL( 3 )
-C
-C     For efficiency reasons, the parameters are not checked.
 C
 C     Set integer pointers to correct subsequences in T22_k and check
 C     workspace. For simplicity, below these subsequences are denoted
@@ -328,6 +337,9 @@ C
          IWORK( I22+I ) = IWORK( I12+I ) + N1
    10 CONTINUE
 C
+      IF( MN.LE.10 )
+     $    MN = 0
+C
 C     Divide workspace into different arrays and submatrices.
 C
       A = 1
@@ -340,6 +352,7 @@ C
          W     = TT    + K * 4
          WE    = TAU
          MN    = MN    + K * 10
+         LDWKE =         K * 5 - 4
       ELSE IF( N1.EQ.1 .AND. N2.EQ.2 ) THEN
          B     = A     + K
          C     = B     + K * 4
@@ -353,6 +366,7 @@ C
          W     = VLOC  + K * 2
          WE    = TAU1
          MN    = MN    + K * 25
+         LDWKE =         K * 18 - 13
       ELSE IF( N1.EQ.2 .AND. N2.EQ.1 ) THEN
          B     = A     + K * 4
          C     = B     + K
@@ -364,6 +378,7 @@ C
          W     = VLOC  + K * 2
          WE    = TAU
          MN    = MN    + K * 23
+         LDWKE =         K * 18 - 13
       ELSE IF( N1.EQ.2 .AND. N2.EQ.2 ) THEN
          B     = A     + K * 4
          C     = B     + K * 4
@@ -379,25 +394,28 @@ C
          W     = VLOC2 + K * 2
          WE    = TAU1
          MN    = MN    + K * 42
+         LDWKE =         K * 68 - 49
       END IF
 C
-      CALL MB03KE( .FALSE., .FALSE., -1, K, N1, N2, EPS, SMLNUM, S, T,
-     $             T, T, SCALOC, DWORK, -1, INFO )
-      MINWRK = MAX( INT( DWORK( 1 ) ) + WE - 1, MN )
+      MINWRK = MAX( LDWKE + WE, MN )
 C
 C     Quick return if possible.
 C
-      DWORK( 1 ) = DBLE( MINWRK )
-      IF( LDWORK.EQ.-1 ) THEN
-         RETURN
-      ELSE IF( LDWORK.LT.MINWRK ) THEN
+      IF( LDWORK.LT.MINWRK ) THEN
+         DWORK( 1 ) = DBLE( MINWRK )
          INFO = -22
          CALL XERBLA( 'MB03KB', -INFO )
          RETURN
       ELSE IF( NC.LE.1 .OR. N1.LE.0 .OR. N2.LE.0 .OR. N1.GT.NC .OR.
-     $        J2.GT.NC .OR. J2 + N2 - 1.GT.NC ) THEN
+     $         J2.GT.NC .OR. J2 + N2 - 1.GT.NC ) THEN
          RETURN
       END IF
+C
+C     Decode the input parameters
+C
+      INFO  = 0
+      WANTQ = LSAME( COMPQ, 'U' )
+      SPECQ = LSAME( COMPQ, 'W' )
 C
 C     Compute some local indices.
 C

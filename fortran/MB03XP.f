@@ -2,24 +2,6 @@
      $                   Q, LDQ, Z, LDZ, ALPHAR, ALPHAI, BETA, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the periodic Schur decomposition and the eigenvalues of
@@ -73,7 +55,7 @@ C             The routine works primarily with the submatrices in rows
 C             and columns ILO to IHI, but applies the transformations to
 C             all the rows and columns of the matrices A and B, if
 C             JOB = 'S'.
-C             1 <= ILO <= max(1,N); min(ILO,N) <= IHI <= N.
+C             1 <= ILO <= max(1,N+1); min(ILO,N) <= IHI <= N.
 C
 C     A       (input/output) DOUBLE PRECISION array, dimension (LDA,N)
 C             On entry, the leading N-by-N part of this array A must
@@ -203,6 +185,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, May 2008 (SLICOT version of the HAPACK routine DHGPQR).
+C     V. Sima, Oct. 2011, April 2015.
 C
 C     KEYWORDS
 C
@@ -263,7 +246,7 @@ C
          INFO = -3
       ELSE IF ( N.LT.0 ) THEN
          INFO = -4
-      ELSE IF ( ILO.LT.1 .OR. ILO.GT.MAX( 1, N ) ) THEN
+      ELSE IF ( ILO.LT.1 .OR. ILO.GT.MAX( 1, N+1 ) ) THEN
          INFO = -5
       ELSE IF ( IHI.LT.MIN( ILO,N ).OR.IHI.GT.N ) THEN
          INFO = -6
@@ -300,25 +283,13 @@ C     FOR I = [1:ILO-1, IHI+1:N]
       I = 1
    10 CONTINUE
       IF ( I.EQ.ILO ) THEN
-         I = IHI+1
+         I = IHI + 1
       END IF
       IF ( I.LE.N ) THEN
          IF ( B(I,I).LT.ZERO ) THEN
-            IF ( WANTT ) THEN
-               DO 20  K = ILO, I
-                  B(K,I) = -B(K,I)
-   20          CONTINUE
-               DO 30  K = I, IHI
-                  A(I,K) = -A(I,K)
-   30          CONTINUE
-            ELSE
+            IF ( .NOT.WANTT ) THEN
                B(I,I) = -B(I,I)
                A(I,I) = -A(I,I)
-            END IF
-            IF ( WANTQ ) THEN
-               DO 40  K = ILO, IHI
-                  Q(K,I) = -Q(K,I)
-   40          CONTINUE
             END IF
          END IF
          ALPHAR(I) = A(I,I)

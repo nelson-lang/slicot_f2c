@@ -1,24 +1,6 @@
       SUBROUTINE MB01UX( SIDE, UPLO, TRANS, M, N, ALPHA, T, LDT, A, LDA,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute one of the matrix products
@@ -110,6 +92,12 @@ C             where NOFF is the number of nonzero elements on the
 C             subdiagonal (if UPLO = 'U') or supdiagonal (if UPLO = 'L')
 C             of T.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -143,6 +131,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, May 2008 (SLICOT version of the HAPACK routine DTRQML).
+C     V. Sima, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -160,7 +149,7 @@ C     .. Scalar Arguments ..
 C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), DWORK(*), T(LDT,*)
 C     .. Local Scalars ..
-      LOGICAL           LSIDE, LTRAN, LUP
+      LOGICAL           LQUERY, LSIDE, LTRAN, LUP
       CHARACTER         ATRAN
       INTEGER           I, IERR, J, K, NOFF, PDW, PSAV, WRKMIN, WRKOPT,
      $                  XDIF
@@ -172,7 +161,7 @@ C     .. External Subroutines ..
       EXTERNAL          DAXPY, DCOPY, DLASCL, DLASET, DTRMM, DTRMV,
      $                  XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         MAX, MIN
+      INTRINSIC         DBLE, MAX, MIN
 C
 C     .. Executable Statements ..
 C
@@ -187,7 +176,8 @@ C
       ELSE
          K = N
       END IF
-      WRKMIN = 2*( K - 1 )
+      WRKMIN = MAX( 1, 2*( K - 1 ) )
+      LQUERY = LDWORK.EQ.-1
 C
       IF ( ( .NOT.LSIDE ).AND.( .NOT.LSAME( SIDE, 'R' ) ) ) THEN
          INFO = -1
@@ -203,11 +193,20 @@ C
          INFO = -8
       ELSE IF ( LDA.LT.MAX( 1, M ) ) THEN
          INFO = -10
-      ELSE IF ( LDWORK.LT.0 .OR.
-     $          ( ALPHA.NE.ZERO .AND. MIN( M, N ).GT.0 .AND.
-     $            LDWORK.LT.WRKMIN ) ) THEN
-         DWORK(1) = DBLE( WRKMIN )
-         INFO = -12
+      ELSE IF ( ALPHA.NE.ZERO .AND. MIN( M, N ).GT.0 ) THEN
+         IF( LQUERY ) THEN
+            IF ( LSIDE ) THEN
+               WRKOPT = ( M/2 )*N + M - 1
+            ELSE
+               WRKOPT = ( N/2 )*M + N - 1
+            END IF
+            WRKOPT = MAX( WRKOPT, WRKMIN )
+            DWORK(1) = DBLE( WRKOPT )
+            RETURN
+         ELSE IF ( LDWORK.LT.WRKMIN ) THEN
+            DWORK(1) = DBLE( WRKMIN )
+            INFO = -12
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -239,6 +238,7 @@ C
          CALL DCOPY( K-1, T(1,2), LDT+1, DWORK, 1 )
       END IF
       NOFF = 0
+C
       DO 5 I = 1, K-1
          IF ( DWORK(I).NE.ZERO )
      $      NOFF = NOFF + 1
@@ -251,6 +251,7 @@ C
       ELSE
          WRKOPT = NOFF*M + N - 1
       END IF
+C
       PSAV = K
       IF ( .NOT.LTRAN ) THEN
          XDIF = 0

@@ -1,24 +1,6 @@
       SUBROUTINE AB09JX( DICO, STDOM, EVTYPE, N, ALPHA, ER, EI, ED,
      $                   TOLINF, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To check stability/antistability of finite eigenvalues with
@@ -108,7 +90,8 @@ C     A. Varga, German Aerospace Center, Oberpfaffenhofen, May 2001.
 C
 C     REVISIONS
 C
-C     V. Sima, Research Institute for Informatics, Bucharest, June 2001.
+C     V. Sima, Research Institute for Informatics, Bucharest, June 2001,
+C     July 2020.
 C
 C     KEYWORDS
 C
@@ -175,11 +158,12 @@ C
       IF( N.EQ.0 )
      $   RETURN
 C
+      SCALE = ONE
+C
       IF( STAB ) THEN
 C
 C        Check the stability of finite eigenvalues.
 C
-         SCALE = ONE
          IF( DISCR ) THEN
             DO 10 I = 1, N
                ABSEV = DLAPY2( ER(I), EI(I) )

@@ -1,24 +1,6 @@
       SUBROUTINE SB03QX( TRANA, UPLO, LYAPUN, N, XANORM, T, LDT, U, LDU,
      $                   R, LDR, FERR, IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To estimate a forward error bound for the solution X of a real
@@ -165,7 +147,8 @@ C
 C     REVISIONS
 C
 C     February 6, 1999, V. Sima, Katholieke Univ. Leuven, Belgium.
-C     V. Sima, Research Institute for Informatics, Bucharest, Oct. 2004.
+C     V. Sima, Research Institute for Informatics, Bucharest, Oct. 2004,
+C     May 2020
 C
 C     KEYWORDS
 C
@@ -193,13 +176,16 @@ C     .. Local Scalars ..
       INTEGER            I, IJ, INFO2, ITMP, J, KASE, NN
       DOUBLE PRECISION   EST, SCALE, TEMP
 C     ..
+C     .. Local Arrays ..
+      INTEGER            ISAVE( 3 )
+C     ..
 C     .. External Functions ..
       LOGICAL            LSAME
       DOUBLE PRECISION   DLANSY
       EXTERNAL           DLANSY, LSAME
 C     ..
 C     .. External Subroutines ..
-      EXTERNAL           DLACON, DSCAL, MA02ED, MB01RU, SB03MY, XERBLA
+      EXTERNAL           DLACN2, DSCAL, MA02ED, MB01RU, SB03MY, XERBLA
 C     ..
 C     .. Intrinsic Functions ..
       INTRINSIC          MAX
@@ -262,7 +248,7 @@ C
 C
 C     REPEAT
    10 CONTINUE
-      CALL DLACON( NN, DWORK( ITMP ), DWORK, IWORK, EST, KASE )
+      CALL DLACN2( NN, DWORK( ITMP ), DWORK, IWORK, EST, KASE, ISAVE )
       IF( KASE.NE.0 ) THEN
 C
 C        Select the triangular part of symmetric matrix to be used.

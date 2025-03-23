@@ -2,24 +2,6 @@
      $                   RANK, R, LDR, Q, LDQ, SV, B, LDB, RP, LDRP,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the minimum norm least squares solution of one of the
@@ -174,6 +156,12 @@ C             For optimum performance LDWORK should be larger than
 C             MAX(1,L,M*N),   if FACT = 'F';
 C             MAX(1,5*L,M*N), if FACT = 'N'.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -212,7 +200,7 @@ C     V. Sima, Research Institute of Informatics, Bucharest, Oct. 1999.
 C
 C     REVISIONS
 C
-C     V. Sima, Feb. 2000.
+C     V. Sima, Feb. 2000, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -232,15 +220,14 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  B(LDB,*), DWORK(*), Q(LDQ,*), R(LDR,*),
      $                  RP(LDRP,*), SV(*)
 C     .. Local Scalars ..
-      LOGICAL           LEFT, NFCT, PINV, TRAN
+      LOGICAL           LEFT, LQUERY, NFCT, PINV, TRAN
       CHARACTER*1       NTRAN
       INTEGER           I, L, MAXWRK, MINWRK, MN
       DOUBLE PRECISION  TOLL
 C     .. External Functions ..
       LOGICAL           LSAME
-      INTEGER           ILAENV
       DOUBLE PRECISION  DLAMCH
-      EXTERNAL          DLAMCH, ILAENV, LSAME
+      EXTERNAL          DLAMCH, LSAME
 C     .. External Subroutines ..
       EXTERNAL          DCOPY, DGEMM, DGEMV, DLACPY, DLASET, MB01SD,
      $                  MB03UD, XERBLA
@@ -285,36 +272,31 @@ C
          INFO = -16
       ELSE IF( LDRP.LT.1 .OR. ( PINV .AND. LDRP.LT.L ) ) THEN
          INFO = -18
-      END IF
+      ELSE
 C
-C     Compute workspace
-C     (Note: Comments in the code beginning "Workspace:" describe the
-C     minimal amount of workspace needed at that point in the code,
-C     as well as the preferred amount for good performance.
-C     NB refers to the optimal block size for the immediately following
-C     subroutine, as returned by ILAENV.)
+C        Compute workspace
+C        (Note: Comments in the code beginning "Workspace:" describe the
+C        minimal amount of workspace needed at that point in the code,
+C        as well as the preferred amount for good performance.)
 C
-      MINWRK = 1
-      IF( INFO.EQ.0 .AND. LDWORK.GE.1 .AND. L.GT.0 ) THEN
+         LQUERY = LDWORK.EQ.-1
          MINWRK = MAX( 1, L )
          MAXWRK = MAX( MINWRK, MN )
          IF( NFCT ) THEN
-            MAXWRK = MAX( MAXWRK, 3*L+2*L*
-     $                    ILAENV( 1, 'DGEBRD', ' ', L, L, -1, -1 ) )
-            MAXWRK = MAX( MAXWRK, 3*L+L*
-     $                    ILAENV( 1, 'DORGBR', 'Q', L, L, L, -1 ) )
-            MAXWRK = MAX( MAXWRK, 3*L+L*
-     $                    ILAENV( 1, 'DORGBR', 'P', L, L, L, -1 ) )
+            CALL MB03UD( 'Vectors', 'Vectors', L, R, LDR, Q, LDQ, SV,
+     $                   DWORK, -1, INFO )
             MINWRK = MAX( 1, 5*L )
-            MAXWRK = MAX( MAXWRK, MINWRK )
+            MAXWRK = MAX( MAXWRK, INT( DWORK( 1 ) ), MINWRK )
          END IF
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY )
+     $      INFO = -20
       END IF
 C
-      IF( LDWORK.LT.MINWRK ) THEN
-         INFO = -20
-      END IF
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'MB02UD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = MAXWRK
          RETURN
       END IF
 C

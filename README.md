@@ -1,8 +1,10 @@
-[![GitHub license](https://img.shields.io/badge/license-GPL2-blue.svg)](https://github.com/Nelson-numerical-software/slicot_f2c/blob/master/LICENSE)
+[![GitHub license](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/Nelson-numerical-software/slicot_f2c/blob/master/LICENSE)
 
 # slicot_f2c for Nelson
 
-slicot 5.0 library using f2c for Nelson
+slicot 5.9 library using f2c for Nelson
+
+based on https://github.com/SLICOT/SLICOT-Reference (BSD-3-Clause)
 
 # build
 

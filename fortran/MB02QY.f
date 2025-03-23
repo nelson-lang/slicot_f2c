@@ -1,24 +1,6 @@
       SUBROUTINE MB02QY( M, N, NRHS, RANK, A, LDA, JPVT, B, LDB, TAU,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To determine the minimum-norm solution to a real linear least
@@ -103,6 +85,12 @@ C             The length of the array DWORK.
 C             LDWORK >= max( 1, N, NRHS ).
 C             For good performance,  LDWORK  should sometimes be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -149,7 +137,7 @@ C     V. Sima, Research Institute for Informatics, Bucharest, Aug. 1999.
 C
 C     REVISIONS
 C
-C     -
+C     V. Sima, Research Institute for Informatics, Bucharest, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -166,6 +154,7 @@ C     .. Array Arguments ..
       INTEGER            JPVT( * )
       DOUBLE PRECISION   A( LDA, * ), B( LDB, * ), DWORK( * ), TAU( * )
 C     .. Local Scalars ..
+      LOGICAL            LQUERY
       INTEGER            I, IASCL, IBSCL, J, MN
       DOUBLE PRECISION   ANRM, BIGNUM, BNRM, MAXWRK, SMLNUM
 C     .. External Functions ..
@@ -197,12 +186,26 @@ C
       ELSE IF( LDB.LT.1 .OR. ( NRHS.GT.0 .AND. LDB.LT.MAX( M, N ) ) )
      $      THEN
          INFO = -9
-      ELSE IF( LDWORK.LT.MAX( 1, N, NRHS ) ) THEN
-         INFO = -12
+      ELSE
+         I      = MAX( 1, N, NRHS )
+         LQUERY = LDWORK.EQ.-1
+         IF ( LQUERY ) THEN
+            RANK = MAX( 0, N-1 )
+            CALL DTZRZF( RANK, N, A, LDA, TAU, DWORK, -1, INFO )
+            MAXWRK = MAX( DBLE( I ), DWORK( 1 ) )
+            CALL DORMRZ( 'Left', 'Transpose', N, NRHS, RANK, N-RANK, A,
+     $                   LDA, TAU, B, LDB, DWORK, -1, INFO )
+            MAXWRK = MAX( MAXWRK, DWORK( 1 ) )
+         END IF
+         IF( LDWORK.LT.I .AND. .NOT.LQUERY )
+     $      INFO = -12
       END IF
 C
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'MB02QY', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = MAXWRK
          RETURN
       END IF
 C

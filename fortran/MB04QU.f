@@ -2,24 +2,6 @@
      $                   V, LDV, W, LDW, C, LDC, D, LDD, CS, TAU, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To overwrite general real m-by-n matrices C and D, or their
@@ -34,7 +16,7 @@ C         Q  *  [       ]   if TRANQ = 'T',
 C               [ op(D) ]
 C
 C     where Q is defined as the product of symplectic reflectors and
-C     Givens rotators,
+C     Givens rotations,
 C
 C         Q = diag( H(1),H(1) ) G(1) diag( F(1),F(1) )
 C             diag( H(2),H(2) ) G(2) diag( F(2),F(2) )
@@ -160,7 +142,7 @@ C
 C     CS      (input) DOUBLE PRECISION array, dimension (2*K)
 C             On entry, the first 2*K elements of this array must
 C             contain the cosines and sines of the symplectic Givens
-C             rotators G(i).
+C             rotations G(i).
 C
 C     TAU     (input) DOUBLE PRECISION array, dimension (K)
 C             On entry, the first K elements of this array must

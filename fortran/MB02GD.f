@@ -1,24 +1,6 @@
       SUBROUTINE MB02GD( TYPET, TRIU, K, N, NL, P, S, T, LDT, RB, LDRB,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the Cholesky factor of a banded symmetric positive
@@ -145,6 +127,12 @@ C             The length of the array DWORK.
 C             LDWORK >= 1 + ( NL + 1 )*K*K + NL*K.
 C             For optimum performance LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -184,7 +172,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, June 2001,
-C     Mar. 2004.
+C     Mar. 2004, Apr. 2011.
 C
 C     KEYWORDS
 C
@@ -203,7 +191,7 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  DWORK(LDWORK), RB(LDRB,*), T(LDT,*)
 C     .. Local Scalars ..
       CHARACTER         STRUCT
-      LOGICAL           ISROW, LTRI
+      LOGICAL           ISROW, LQUERY, LTRI
       INTEGER           HEAD, I, IERR, J, JJ, KK, LEN, LEN2, LENR, NB,
      $                  NBMIN, PDW, POSR, PRE, RNK, SIZR, STPS, WRKMIN,
      $                  WRKOPT
@@ -215,10 +203,10 @@ C     .. External Functions ..
       INTEGER           ILAENV
       EXTERNAL          ILAENV, LSAME
 C     .. External Subroutines ..
-      EXTERNAL          DCOPY, DLACPY, DLASET, DPOTRF, DTRSM, MB02CU,
-     $                  MB02CV, XERBLA
+      EXTERNAL          DCOPY, DGELQF, DGEQRF, DLACPY, DLASET, DPOTRF,
+     $                  DTRSM, MB02CU, MB02CV, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         DBLE, MAX, MIN, MOD
+      INTRINSIC         DBLE, INT, MAX, MIN, MOD
 C
 C     .. Executable Statements ..
 C
@@ -261,15 +249,29 @@ C
      $          ( .NOT.LTRI .AND. LDRB.LT.MAX( 1, LENR ) ) )
      $      THEN
          INFO = -11
-      ELSE IF ( LDWORK.LT.WRKMIN ) THEN
-         DWORK(1) = DBLE( WRKMIN )
-         INFO = -13
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         PDW = LENR*K + 1
+         KK  = PDW + 4*K
+         IF ( ISROW ) THEN
+            CALL DGEQRF( K, LENR, T, LDT, DWORK, DWORK, -1, INFO )
+         ELSE
+            CALL DGELQF( LENR, K, T, LDT, DWORK, DWORK, -1, INFO )
+         END IF
+         WRKOPT = KK + INT( DWORK(1) )
+         IF ( LDWORK.LT.WRKMIN .AND. .NOT.LQUERY ) THEN
+            DWORK(1) = DBLE( WRKMIN )
+            INFO = -13
+         END IF
       END IF
 C
 C     Return if there were illegal values.
 C
       IF ( INFO.NE.0 ) THEN
          CALL XERBLA( 'MB02GD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C
@@ -383,21 +385,12 @@ C
          POSR = 1
       END IF
 C
-      PDW  = LENR*K + 1
       HEAD = MOD( ( PRE - 1 )*K, LENR )
 C
 C     Determine block size for the involved block Householder
 C     transformations.
 C
-      IF ( ISROW ) THEN
-         NB = MIN( ILAENV( 1, 'DGEQRF', ' ', K, LENR, -1, -1 ), K )
-      ELSE
-         NB = MIN( ILAENV( 1, 'DGELQF', ' ', LENR, K, -1, -1 ), K )
-      END IF
-      KK = PDW + 4*K
-      WRKOPT = KK + LENR*NB
-      KK = LDWORK - KK
-      IF ( KK.LT.LENR*NB )  NB = KK / LENR
+      NB = MIN( INT( ( LDWORK - KK )/LENR ), K )
       IF ( ISROW ) THEN
          NBMIN = MAX( 2, ILAENV( 2, 'DGEQRF', ' ', K, LENR, -1, -1 ) )
       ELSE

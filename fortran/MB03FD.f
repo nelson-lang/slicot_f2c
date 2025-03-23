@@ -1,24 +1,6 @@
       SUBROUTINE MB03FD( N, PREC, A, LDA, B, LDB, Q1, LDQ1, Q2, LDQ2,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute orthogonal matrices Q1 and Q2 for a real 2-by-2 or
@@ -30,12 +12,12 @@ C                   (  0  A22 )     ( B21  0  )
 C
 C     such that Q2' A Q1 is upper triangular, Q2' B Q1 is upper quasi-
 C     triangular, and the eigenvalues with negative real parts (if there
-C     are any) are allocated on the top. The submatrices A11, A22, and
-C     B12 are upper triangular. If B21 is 2-by-2, then all the other
-C     blocks are nonsingular and the product
-C
-C        -1        -1
-C     A11   B12 A22   B21 has a pair of complex conjugate eigenvalues.
+C     are any) are allocated on the top. The notation M' denotes the
+C     transpose of the matrix M. The submatrices A11, A22, and B12 are
+C     upper triangular. If B21 is 2-by-2, then all the other blocks are
+C                                    -1        -1
+C     nonsingular and the product A11   B12 A22   B21 has a pair of
+C     complex conjugate eigenvalues.
 C
 C     ARGUMENTS
 C
@@ -134,7 +116,9 @@ C
 C     REVISIONS
 C
 C     V. Sima, Aug. 2009 (SLICOT version of the routine MB03FD).
-C     V. Sima, Oct. 2009, Nov. 2009, Oct. 2010, Nov. 2010.
+C     V. Sima, Oct. 2009, Nov. 2009, Oct. 2010, Nov. 2010, Mar. 2016,
+C     Mai 2016.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C
@@ -156,57 +140,90 @@ C     .. Array Arguments ..
      $                   Q1( LDQ1, * ), Q2( LDQ2, * )
 C
 C     .. Local Scalars ..
-      LOGICAL            COMPG
-      INTEGER            IDUM
-      DOUBLE PRECISION   A11, A22, B12, B21, CO, SI, TMP
+      INTEGER            IDUM, IERR, IHI, ILO
+      DOUBLE PRECISION   A11, A22, B12, B21, CO, SAFMIN, SCALA, SCALB,
+     $                   SI, TMP
 C
 C     .. Local Arrays ..
       LOGICAL            BWORK( 4 )
+      DOUBLE PRECISION   AS( 4, 4 ), BS( 4, 4 ), C( 4 ), R( 4 )
 C
 C     .. External Functions ..
       LOGICAL            SB02OW
-      EXTERNAL           SB02OW
+      DOUBLE PRECISION   DLAMCH
+      EXTERNAL           DLAMCH, SB02OW
 C
 C     .. External Subroutines ..
-      EXTERNAL           DGGES, DLARTG
+      EXTERNAL           DGGBAK, DGGES, DLACPY, DLARTG, MB04DL
 C
 C     .. Intrinsic Functions ..
-      INTRINSIC          ABS, SIGN, SQRT
+      INTRINSIC          ABS, MAX, SIGN, SQRT
 C
 C     .. Executable Statements ..
 C
 C     For efficiency, the input arguments are not tested.
 C
-      INFO = 0
-C
 C     Computations.
 C
       IF( N.EQ.4 ) THEN
-         CALL DGGES( 'Vector Computation', 'Vector Computation',
-     $               'Sorted', SB02OW, N, B, LDB, A, LDA, IDUM, DWORK,
-     $               DWORK( N+1 ), DWORK( 2*N+1 ), Q2, LDQ2, Q1, LDQ1,
-     $               DWORK( 3*N+1 ), LDWORK-3*N, BWORK, INFO )
+C
+C        Save A and B, since DGGES might not converge.
+C
+         CALL DLACPY( 'Full', N, N, A, LDA, AS, 4 )
+         CALL DLACPY( 'Full', N, N, B, LDB, BS, 4 )
+         CALL DGGES(  'Vector Computation', 'Vector Computation',
+     $                'Sorted', SB02OW, N, B, LDB, A, LDA, IDUM, DWORK,
+     $                DWORK( N+1 ), DWORK( 2*N+1 ), Q2, LDQ2, Q1, LDQ1,
+     $                DWORK( 3*N+1 ), LDWORK-3*N, BWORK, INFO )
          IF( INFO.NE.0 ) THEN
-            IF( INFO.GE.1 .AND. INFO.LE.4 ) THEN
-               INFO = 1
-            ELSE IF ( INFO.NE.6 ) THEN
-               INFO = 2
-            ELSE
-               INFO = 0
+C
+C           Retry after balancing.
+C
+            CALL DLACPY( 'Full', N, N, AS, 4, A, LDA )
+            CALL DLACPY( 'Full', N, N, BS, 4, B, LDB )
+            CALL MB04DL( 'Both', N, ZERO, B, LDB, A, LDA, ILO, IHI, C,
+     $                   R, DWORK, IDUM, IERR )
+            CALL DGGES(  'Vector Computation', 'Vector Computation',
+     $                   'Sorted', SB02OW, N, B, LDB, A, LDA, IDUM,
+     $                   DWORK, DWORK( N+1 ), DWORK( 2*N+1 ), Q2, LDQ2,
+     $                   Q1, LDQ1, DWORK( 3*N+1 ), LDWORK-3*N, BWORK,
+     $                   IERR )
+C
+C           If DGGES fails again, error return based on previous call.
+C
+            IF( IERR.NE.0 ) THEN
+               IF( INFO.GE.1 .AND. INFO.LE.4 ) THEN
+                  INFO = 1
+               ELSE
+                  INFO = 2
+               END IF
+               RETURN
             END IF
+            CALL DGGBAK( 'Both', 'Right', N, ILO, IHI, C, R, N, Q1,
+     $                   LDQ1, INFO )
+            CALL DGGBAK( 'Both', 'Left',  N, ILO, IHI, C, R, N, Q2,
+     $                   LDQ2, INFO )
          END IF
-         RETURN
       ELSE
+         INFO = 0
 C
-C        The pencil has infinite eigenvalues. The code decides this when
-C        A is (numerically) singular.
+C        Set Q1, and Q2 to I_2, or permuted I_2, if there are 0, purely
+C        imaginary, or infinite eigenvalues.
 C
-         A11   = ABS( A( 1, 1 ) )
-         A22   = ABS( A( 2, 2 ) )
-         B21   = ABS( B( 2, 1 ) )
-         B12   = ABS( B( 1, 2 ) )
-         COMPG = .FALSE.
-         IF( A11.LE.PREC*A22 ) THEN
+         A11 = ABS( A( 1, 1 ) )
+         A22 = ABS( A( 2, 2 ) )
+         B21 = ABS( B( 2, 1 ) )
+         B12 = ABS( B( 1, 2 ) )
+C
+         SAFMIN = DLAMCH( 'Safe minimum' )
+         SCALA  = ONE / MAX( A11, A22, SAFMIN )
+         SCALB  = ONE / MAX( B12, B21, SAFMIN )
+C
+         A11 = SCALA*A11
+         A22 = SCALA*A22
+         B21 = SCALB*B21
+         B12 = SCALB*B12
+         IF( A11.LE.PREC ) THEN
             Q1( 1, 1 ) = ONE
             Q1( 2, 1 ) = ZERO
             Q1( 1, 2 ) = ZERO
@@ -215,7 +232,7 @@ C
             Q2( 2, 1 ) = ONE
             Q2( 1, 2 ) = ONE
             Q2( 2, 2 ) = ZERO
-         ELSE IF( A22.LE.PREC*A11 ) THEN
+         ELSE IF( A22.LE.PREC ) THEN
             Q1( 1, 1 ) = ZERO
             Q1( 2, 1 ) = ONE
             Q1( 1, 2 ) = ONE
@@ -224,14 +241,45 @@ C
             Q2( 2, 1 ) = ZERO
             Q2( 1, 2 ) = ZERO
             Q2( 2, 2 ) = ONE
+         ELSE IF( B21.LE.PREC ) THEN
+            Q1( 1, 1 ) = ONE
+            Q1( 2, 1 ) = ZERO
+            Q1( 1, 2 ) = ZERO
+            Q1( 2, 2 ) = ONE
+            Q2( 1, 1 ) = ONE
+            Q2( 2, 1 ) = ZERO
+            Q2( 1, 2 ) = ZERO
+            Q2( 2, 2 ) = ONE
+         ELSE IF( B12.LE.PREC ) THEN
+            Q1( 1, 1 ) = ZERO
+            Q1( 2, 1 ) = ONE
+            Q1( 1, 2 ) = ONE
+            Q1( 2, 2 ) = ZERO
+            Q2( 1, 1 ) = ZERO
+            Q2( 2, 1 ) = ONE
+            Q2( 1, 2 ) = ONE
+            Q2( 2, 2 ) = ZERO
          ELSE
-            COMPG = .TRUE.
-         END IF
-         IF( COMPG ) THEN
+            IF( SIGN( ONE, A( 1, 1 ) )*SIGN( ONE, A( 2, 2 ) )*
+     $          SIGN( ONE, B( 2, 1 ) )*SIGN( ONE, B( 1, 2 ) ).GT.ZERO
+     $        ) THEN
 C
-C           The pencil has a double zero eigenvalue.
+C              The pencil has two real eigenvalues.
 C
-            IF( B21.LE.PREC*B12 ) THEN
+               CALL DLARTG( SIGN( ONE, A( 1, 1 )*A( 2, 2 ) )*
+     $                      SQRT( A22*B12 ), SQRT( A11*B21 ), CO, SI,
+     $                      TMP )
+               Q1( 1, 1 ) =  CO
+               Q1( 2, 1 ) = -SI
+               Q1( 1, 2 ) =  SI
+               Q1( 2, 2 ) =  CO
+               CALL DLARTG( SQRT( A11*B12 ), SQRT( A22*B21 ), CO, SI,
+     $                      TMP )
+               Q2( 1, 1 ) =  CO
+               Q2( 2, 1 ) = -SI
+               Q2( 1, 2 ) =  SI
+               Q2( 2, 2 ) =  CO
+            ELSE
                Q1( 1, 1 ) = ONE
                Q1( 2, 1 ) = ZERO
                Q1( 1, 2 ) = ZERO
@@ -240,34 +288,7 @@ C
                Q2( 2, 1 ) = ZERO
                Q2( 1, 2 ) = ZERO
                Q2( 2, 2 ) = ONE
-            ELSE IF( B12.LE.PREC*B21 ) THEN
-               Q1( 1, 1 ) = ZERO
-               Q1( 2, 1 ) = ONE
-               Q1( 1, 2 ) = ONE
-               Q1( 2, 2 ) = ZERO
-               Q2( 1, 1 ) = ZERO
-               Q2( 2, 1 ) = ONE
-               Q2( 1, 2 ) = ONE
-               Q2( 2, 2 ) = ZERO
-            ELSE
-               COMPG = .TRUE.
             END IF
-         END IF
-         IF( COMPG ) THEN
-C
-C           The pencil has real eigenvalues.
-C
-            CALL DLARTG( SIGN( ONE, A( 1, 1 )*A( 2, 2 ) )*
-     $                   SQRT( A22*B12 ), SQRT( A11*B21 ), CO, SI, TMP )
-            Q1( 1, 1 ) =  CO
-            Q1( 2, 1 ) = -SI
-            Q1( 1, 2 ) =  SI
-            Q1( 2, 2 ) =  CO
-            CALL DLARTG( SQRT( A11*B12 ), SQRT( A22*B21 ), CO, SI, TMP )
-            Q2( 1, 1 ) =  CO
-            Q2( 2, 1 ) = -SI
-            Q2( 1, 2 ) =  SI
-            Q2( 2, 2 ) =  CO
          END IF
       END IF
 C

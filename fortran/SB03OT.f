@@ -1,24 +1,6 @@
       SUBROUTINE SB03OT( DISCR, LTRANS, N, S, LDS, R, LDR, SCALE, DWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve for X = op(U)'*op(U) either the stable non-negative
@@ -175,7 +157,7 @@ C     Bochum, May 1992.
 C
 C     REVISIONS
 C
-C     Dec. 1997, April 1998, May 1999, Feb. 2004.
+C     Dec. 1997, April 1998, May 1999, Feb. 2004, Jan. - Feb. 2022.
 C
 C     KEYWORDS
 C
@@ -520,10 +502,6 @@ C
                END IF
 C
                SCALOC = ONE
-               IF( TEMP.LT.SMIN ) THEN
-                  TEMP  = SMIN
-                  INFOM = 1
-               END IF
                DR = ABS( R(K,K) )
                IF( TEMP.LT.ONE .AND. DR.GT.ONE ) THEN
                   IF( DR.GT.BIGNUM*TEMP )

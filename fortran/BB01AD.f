@@ -2,24 +2,6 @@
      1                  A, LDA, B, LDB, C, LDC, G, LDG, Q, LDQ, X, LDX,
      2                  DWORK, LDWORK, INFO)
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To generate the benchmark examples for the numerical solution of
@@ -110,7 +92,7 @@ C             NOTE that if DEF = 'D' or 'd', the values of DPAR entries
 C             on input are ignored and, on output, they are overwritten
 C             with the default parameters.
 C
-C     IPAR    (input/output) INTEGER array, dimension (3)
+C     IPAR    (input/output) INTEGER array, dimension (4)
 C             On input, IPAR(1) determines the actual state dimension,
 C             i.e., the order of the matrix A as follows, where
 C             NO = NR(1).NR(2).
@@ -156,6 +138,11 @@ C             On output, IPAR(3) contains the number of rows of the
 C             matrix C in (II).
 C             NOTE that currently IPAR(3) is overwritten and that
 C             rank(Q) <= IPAR(3).
+C
+C             On input, if NR(1) = NR(2) = 4, and other data file than
+C             that used by default is desired, then IPAR(4) is the
+C             length of the character string in CHPAR specifying the
+C             file name.
 C
 C     BPAR    (input) BOOLEAN array, dimension (6)
 C             This array defines the form of the output of the examples
@@ -380,7 +367,7 @@ C     test examples, please send e-mail to benner@math.uni-bremen.de.
 C
 C     REVISIONS
 C
-C     1999, December 23 (V. Sima).
+C     V. Sima, 1999, December 23, May 2016.
 C
 C     KEYWORDS
 C
@@ -404,10 +391,10 @@ C     .. Scalar Arguments ..
       CHARACTER        DEF
 C
 C     .. Array Arguments ..
-      INTEGER          IPAR(3), NR(2)
+      INTEGER          IPAR(4), NR(2)
       DOUBLE PRECISION A(LDA,*), B(LDB,*), C(LDC,*), DPAR(*), DWORK(*),
      1                 G(*), Q(*), X(LDX,*)
-      CHARACTER        CHPAR*255
+      CHARACTER        CHPAR*(*)
       LOGICAL          BPAR(6), VEC(9)
 C
 C     .. Local Scalars ..
@@ -439,7 +426,7 @@ C     . SLICOT .
       EXTERNAL         MA02DD, MA02ED
 C
 C     .. Intrinsic Functions ..
-      INTRINSIC        COS, MAX, MIN, MOD, SQRT
+      INTRINSIC        COS, DBLE, MAX, MIN, MOD, SQRT
 C
 C     .. Data Statements ..
 C     . default values for dimensions .
@@ -622,7 +609,7 @@ C
           OPEN(1, IOSTAT = IOS, STATUS = 'OLD', FILE = CHPAR(1:11))
           IF (IOS .NE. 0) THEN
             INFO = 1
-          ELSE IF (NR(2) .LE. 6) THEN
+          ELSE
             DO 10  I = 1, IPAR(1)
               READ (1, FMT = *, IOSTAT = IOS)
      1                                 (A(I,J), J = 1, IPAR(1))
@@ -1045,9 +1032,14 @@ C         .. set up remaining parameters ..
           END IF
 C
         ELSE IF (NR(2) .EQ. 4) THEN
-          IF (.NOT. LSAME(DEF,'N')) WRITE (CHPAR(1:11), '(A,I1,A,I1,A)')
-     1                               'BB01', NR(1), '0', NR(2), '.dat'
-          OPEN(1, IOSTAT = IOS, STATUS = 'OLD', FILE = CHPAR(1:11))
+          IF (.NOT. LSAME(DEF,'N')) THEN
+             WRITE (CHPAR(1:11), '(A,I1,A,I1,A)')
+     1                            'BB01', NR(1), '0', NR(2), '.dat'
+             I = 11
+          ELSE
+             I = IPAR(4)
+          END IF
+          OPEN(1, IOSTAT = IOS, STATUS = 'OLD', FILE = CHPAR(1:I))
           IF (IOS .NE. 0) THEN
             INFO = 1
           ELSE

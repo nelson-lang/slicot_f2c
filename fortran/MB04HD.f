@@ -1,39 +1,24 @@
       SUBROUTINE MB04HD( COMPQ1, COMPQ2, N, A, LDA, B, LDB, Q1, LDQ1,
-     $                   Q2, LDQ2, BWORK, IWORK, LIWORK, DWORK, LDWORK,
+     $                   Q2, LDQ2, IWORK, LIWORK, DWORK, LDWORK, BWORK,
      $                   INFO )
-C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
 C
 C     PURPOSE
 C
 C     To compute the transformed matrices A and B, using orthogonal
 C     matrices Q1 and Q2 for a real N-by-N regular pencil
 C
-C                    ( A11   0  )     (  0   B12 )
-C       aA - bB =  a (          ) - b (          ),                  (1)
-C                    (  0   A22 )     ( B21   0  )
+C                   ( A11   0  )     (  0   B12 )
+C       aA - bB = a (          ) - b (          ),                   (1)
+C                   (  0   A22 )     ( B21   0  )
 C
-C     where A11, A22 and B12 are upper triangular and the generalized
-C                       -1        -1
-C     matrix product A11   B12 A22   B21 is upper quasi-triangular,
-C     such that the matrix Q2' A Q1 is upper triangular and Q2' B Q1 is
-C     upper quasi-triangular.
+C     where A11, A22 and B12 are upper triangular, B21 is upper
+C     quasi-triangular and the generalized matrix product
+C        -1        -1
+C     A11   B12 A22   B21 is in periodic Schur form, such that the
+C     matrix Q2' A Q1 is upper triangular, Q2' B Q1 is upper
+C     quasi-triangular and the transformed pencil
+C     a(Q2' A Q1) - b(Q2' B Q1) is in generalized Schur form. The
+C     notation M' denotes the transpose of the matrix M.
 C
 C     ARGUMENTS
 C
@@ -66,7 +51,7 @@ C
 C     Input/Output Parameters
 C
 C     N       (input) INTEGER
-C             Order of the pencil aA - bB, N has to be even.
+C             Order of the pencil aA - bB, N >= 0, even.
 C
 C     A       (input/output) DOUBLE PRECISION array, dimension (LDA, N)
 C             On entry, the leading N-by-N block diagonal part of this
@@ -122,13 +107,11 @@ C             LDQ2 >= MAX(1, N), if COMPQ2 = 'I' or COMPQ2 = 'U'.
 C
 C     Workspace
 C
-C     BWORK   LOGICAL array, dimension (N/2)
-C
 C     IWORK   INTEGER array, dimension (LIWORK)
 C
 C     LIWORK  INTEGER
 C             The dimension of the array IWORK.
-C             LIWORK >= N/2 + 32.
+C             LIWORK >= MAX( N/2+1, 32 ).
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if INFO = 0, DWORK(1) returns the optimal LDWORK.
@@ -145,6 +128,8 @@ C             routine only calculates the optimal size of the DWORK
 C             array, returns this value as the first entry of the DWORK
 C             array, and no error message is issued by XERBLA. 
 C
+C     BWORK   LOGICAL array, dimension (N/2)
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -154,10 +139,10 @@ C             = 1: the periodic QZ algorithm failed to reorder the
 C                  eigenvalues (the problem is very ill-conditioned) in
 C                  the SLICOT Library routine MB03KD;
 C             = 2: the standard QZ algorithm failed in the LAPACK
-C                  routine DGGEV, called by the SLICOT routine MB03DD;
-C             = 3: the standard QZ algorithm failed in the LAPACK
 C                  routines DGGES or DHGEQZ, called by the SLICOT
 C                  routines MB03DD or MB03FD;
+C             = 3: the eigenvalue reordering failed in the LAPACK
+C                  routine DTGEX2, called by the SLICOT routine MB03FD;
 C             = 4: the standard QZ algorithm failed to reorder the
 C                  eigenvalues in the LAPACK routine DTGSEN, called by
 C                  the SLICOT routine MB03DD.
@@ -265,7 +250,9 @@ C     V. Sima, Dec. 2009 (SLICOT version of the routine DBTUMT).
 C
 C     REVISIONS
 C
-C     V. Sima, Aug. 2009, Feb. 2010, Jul. 2010, Sep.-Nov. 2010.
+C     V. Sima, Aug. 2009, Feb. 2010, July 2010, Sep.-Nov. 2010,
+C     Jan. 2011, Mar. 2011, July 2011, Aug. 2014, Apr. 2016.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C
@@ -302,6 +289,7 @@ C     .. Local Scalars ..
       DOUBLE PRECISION   BASE, LGBAS, TMP2, TMP3, ULP
 C
 C     .. Local Arrays ..
+      LOGICAL            BW( 4 )
       INTEGER            IDUM( 1 )
       DOUBLE PRECISION   DUM( 1 )
 C
@@ -311,12 +299,12 @@ C     .. External Functions ..
       EXTERNAL           DLAMCH, LSAME, SB02OW
 C
 C     .. External Subroutines ..
-      EXTERNAL           DAXPY, DCOPY, DGEMM, DGEMV, DGGES, DGGEV,
-     $                   DLACPY, DLASET, DSCAL, DTGSEN, MA01BD, MB03BA,
-     $                   MB03DD, MB03FD, MB03KD, XERBLA
+      EXTERNAL           DAXPY, DCOPY, DGEMM, DGEMV, DGGES, DLACPY,
+     $                   DLASET, DSCAL, MA01BD, MB03BA, MB03DD, MB03FD,
+     $                   MB03KD, XERBLA
 C
 C     .. Intrinsic Functions ..
-      INTRINSIC          DBLE, INT, LOG, MAX, MIN, MOD
+      INTRINSIC          INT, LOG, MAX, MIN, MOD
 C
 C     .. Executable Statements ..
 C
@@ -350,7 +338,7 @@ C
          INFO = -9
       ELSE IF( LDQ2.LT.1 .OR. LCMPQ2 .AND. LDQ2.LT.MAX( 1, N ) ) THEN
          INFO = -11
-      ELSE IF( LIWORK.LT.M + 32 ) THEN
+      ELSE IF( LIWORK.LT.MAX( M + 1, 32 ) ) THEN
          INFO = -14
       ELSE IF( .NOT. LQUERY .AND. LDWORK.LT.MINWRK ) THEN
          DWORK( 1 ) = MINWRK
@@ -365,23 +353,19 @@ C
 C        Compute optimal workspace.
 C
          I = MAX( 1, MIN( 4, N ) )
+         DO 5 J = 1, I
+            BW( I ) = .TRUE.
+    5    CONTINUE
          CALL DGGES(  'Vectors', 'Vectors', 'Sorted', SB02OW, I, A, LDA,
-     $                B, LDB, IDUM, DWORK, DWORK, DWORK, Q1, I, Q2, I,
-     $                DWORK, -1, BWORK, INFO )
+     $                B, LDB, IDUM( 1 ), DWORK, DWORK, DWORK, Q1, I, Q2,
+     $                I, DWORK, -1, BW, INFO )
          CALL DGGES(  'Vectors', 'Vectors', 'Not sorted', SB02OW, I, A,
-     $                LDA, B, LDB, IDUM, DWORK, DWORK, DWORK, Q1, I, Q2,
-     $                I, DWORK( 2 ), -1, BWORK, INFO )
-         CALL DGGEV(  'No Vector', 'No Vector', 2, A, LDA, B, LDB,
-     $                DWORK, DWORK, DWORK, DUM, 1, DUM, 1, DWORK( 3 ),
-     $                -1, INFO )
-         CALL DTGSEN( 0, .TRUE., .TRUE., BWORK, I, A, LDA, B, LDB,
-     $                DWORK, DWORK, DWORK, Q1, I, Q2, I, IDUM, TMP2,
-     $                TMP2, DUM, DWORK( 4 ), -1, IDUM, 1, INFO )
+     $                LDA, B, LDB, IDUM( 1 ), DWORK, DWORK, DWORK, Q1,
+     $                I, Q2, I, DWORK( 2 ), -1, BW, INFO )
 C
-         OPTWRK = MAX( 64 + MAX( 12 + INT( DWORK( 1 ) ), 4*M + 8,
-     $                           24 + INT( DWORK( 2 ) ),
-     $                            6 + INT( DWORK( 3 ) ),
-     $                           12 + INT( DWORK( 4 ) ), 4*N ), MINWRK )
+         OPTWRK = MAX( 64 + MAX( 12 + INT( DWORK( 1 ) ), 4*N,
+     $                           24 + INT( DWORK( 2 ) ), 28 + 4*I ),
+     $                           MINWRK )
          IF( LQUERY ) THEN
             DWORK( 1 ) = OPTWRK
             RETURN
@@ -450,7 +434,7 @@ C     WHILE( J.LE.M ) DO
             CALL MA01BD( BASE, LGBAS, K, IWORK( 2*K+1 ),
      $                   DWORK( (J-1)*M+J ), MM, DWORK( IA ),
      $                   DWORK( IB ), IWORK( 3*K+1 ) )
-            BWORK( J ) = DWORK( IA ).GT.ZERO
+            BWORK( J ) = DWORK( IA ).GT.ZERO .OR. DWORK( IB ).EQ.ZERO
             J = J + 1
             GO TO 10
          ELSE
@@ -462,7 +446,7 @@ C     WHILE( J.LE.M ) DO
       ELSE IF ( J.EQ.M ) THEN
          CALL MA01BD( BASE, LGBAS, K, IWORK( 2*K+1 ), DWORK( MM ), MM,
      $                DWORK( IA ), DWORK( IB ), IWORK( 3*K+1 ) )
-         BWORK( J ) = DWORK( IA ).GT.ZERO
+         BWORK( J ) = DWORK( IA ).GT.ZERO .OR. DWORK( IB ).EQ.ZERO
       END IF
 C     END WHILE 10
 C
@@ -647,8 +631,9 @@ C
             CALL DLASET( 'Full', M2, M2, ZERO, ZERO, B( I2, I2 ), LDB )
             CALL DLACPY( 'Upper', M2, M2, DWORK( IB21+M*M1+M1 ), M,
      $                   B( I3, I2 ), LDB )
-            CALL DCOPY( M2-1, DWORK( IB21+M*M1+I1 ), MP1, B( I3+1, I2 ),
-     $                  LDB+1 )
+            IF( I3.LT.N )
+     $         CALL DCOPY( M2-1, DWORK( IB21+M*M1+I1 ), MP1,
+     $                     B( I3+1, I2 ), LDB+1 )
             IF( M2.GT.2 )
      $         CALL DLASET( 'Lower', M2-2, M2-2, ZERO, ZERO,
      $                      B( I3+2, I2 ), LDB )
@@ -800,7 +785,7 @@ C
          END IF
 C
 C        Perform eigenvalue exchange.
-C        Workspace:   need   64 + max( 63, 4*M + 8 ).
+C        Workspace:   need   64 + max( 63, 4*N ).
 C
          IWRK  = 4*SDIM*SDIM + 1
          ITMP  = IWRK  + M*DIM1
@@ -810,7 +795,8 @@ C
      $                SDIM, DWORK( I1UPLE ), SDIM, DWORK( I2UPLE ),
      $                SDIM, DWORK( IWRK ), LDWORK-IWRK+1, INFO )
          IF( INFO.GT.0 ) THEN
-            INFO = 3
+            IF( INFO.LT.3 )
+     $         INFO = 2
             RETURN
          END IF
 C
@@ -1285,10 +1271,8 @@ C
      $                   SDIM, DWORK( I2UPLE ), SDIM, DWORK( IWRK ),
      $                   LDWORK-IWRK+1, INFO )
             IF( INFO.GT.0 ) THEN
-               IF( INFO.LE.2 ) THEN
+               IF( INFO.LE.4 ) THEN
                   INFO = 2
-               ELSE IF( INFO.LE.4 ) THEN
-                  INFO = 3
                ELSE
                   INFO = 4
                END IF

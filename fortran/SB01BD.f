@@ -2,24 +2,6 @@
      $                   NFP, NAP, NUP, F, LDF, Z, LDZ, TOL, DWORK,
      $                   LDWORK, IWARN, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To determine the state feedback matrix F for a given system (A,B)
@@ -252,6 +234,8 @@ C     Feb. 15, 2004, V. Sima, Research Institute for Informatics,
 C     Bucharest.
 C     May 12, 2005. A. Varga, German Aerospace Center,
 C     DLR Oberpfaffenhofen.
+C     Dec. 29, 2012, V. Sima, Research Institute for Informatics,
+C     Bucharest.
 C
 C     KEYWORDS
 C
@@ -286,8 +270,8 @@ C     .. External Functions ..
       DOUBLE PRECISION DLAMCH, DLANGE
       EXTERNAL         DLAMCH, DLANGE, LSAME, SELECT
 C     .. External Subroutines ..
-      EXTERNAL         DGEES, DGEMM, DLAEXC, DLASET, DROT, DSWAP,
-     $                 MB03QD, MB03QY, SB01BX, SB01BY, XERBLA
+      EXTERNAL         DCOPY, DGEES, DGEMM, DLAEXC, DLASET, DROT,
+     $                 DSWAP, MB03QD, MB03QY, SB01BX, SB01BY, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC        DBLE, INT, MAX
 C     ..
@@ -409,7 +393,7 @@ C     Perform eigenvalue assignment if there exist "bad" eigenvalues.
 C
       NAP = 0
       NUP = 0
-      IF( NFP .LT. N ) THEN
+      IF( NFP.LT.N ) THEN
          KG  = 1
          KFI = KG  + 2*M
          KW  = KFI + 2*M
@@ -423,10 +407,10 @@ C        Separate and count real and complex eigenvalues to be assigned.
 C
          NPR = 0
          DO 10 I = 1, NP
-            IF( WI(I) .EQ. ZERO ) THEN
+            IF( WI(I).EQ.ZERO ) THEN
                NPR = NPR + 1
                K = I - NPR
-               IF( K .GT. 0 ) THEN
+               IF( K.GT.0 ) THEN
                   S = WR(I)
                   DO 5 J = NPR + K - 1, NPR, -1
                      WR(J+1) = WR(J)
@@ -483,7 +467,7 @@ C
 C
 C           Test for termination with INFO = 3.
 C
-            IF( NAP.EQ.NP) THEN
+            IF( NAP.EQ.NP ) THEN
                INFO = 3
 C
 C              Test for compatibility. Terminate if an attempt occurs
@@ -505,7 +489,7 @@ C
      $             ( IB.EQ.1 .AND. NPR.EQ.1 .AND. NSUP.GT.NLOW .AND.
      $               NPR+NPC.GT.NSUP-NLOW+1 ) ) THEN
                   IF( NSUP.GT.2 ) THEN
-                     IF( A(NSUP-1,NSUP-2) .NE. ZERO ) THEN
+                     IF( A(NSUP-1,NSUP-2).NE.ZERO ) THEN
 C
 C                       Interchange with the adjacent 2x2 block.
 C
@@ -513,7 +497,7 @@ C                       Workspace needed: N.
 C
                         CALL DLAEXC( .TRUE., N, A, LDA, Z, LDZ, NSUP-2,
      $                               2, 1, DWORK(KW), INFO )
-                        IF( INFO .NE. 0 ) THEN
+                        IF( INFO.NE.0 ) THEN
                            INFO = 2
                            RETURN
                         END IF
@@ -528,34 +512,35 @@ C
                      SIMPLB = .FALSE.
                   END IF
                   IB = 2
+                  NL = NSUP - IB + 1
+C
+C                 Compute G, the current last IB rows of Z'*B.
+C
+                  CALL DGEMM( 'Transpose', 'NoTranspose', IB, M, N, ONE,
+     $                        Z(1,NL), LDZ, B, LDB, ZERO, DWORK(KG),
+     $                        IB )
+C
+C                 Check the controllability for the current block.
+C
+                  IF( DLANGE( '1', IB, M, DWORK(KG), IB, DWORK(KW) )
+     $               .LE.TOLERB ) THEN
+C
+C                    Deflate the uncontrollable block and resume the
+C                    main loop.
+C
+                     NSUP = NSUP - IB
+                     NUP = NUP + IB
+                     GO TO 20
+                  END IF
                END IF
-               NL = NSUP - IB + 1
 C
-C              Compute G, the current last IB rows of Z'*B.
-C
-               CALL DGEMM( 'Transpose', 'NoTranspose', IB, M, N, ONE,
-     $                      Z(1,NL), LDZ, B, LDB, ZERO, DWORK(KG), IB )
-C
-C              Check the controllability for the current block.
-C
-               IF( DLANGE( '1', IB, M, DWORK(KG), IB, DWORK(KW) )
-     $            .LE. TOLERB ) THEN
-C
-C                 Deflate the uncontrollable block and resume the
-C                 main loop.
-C
-                  NSUP = NSUP - IB
-                  NUP = NUP + IB
-                  GO TO 20
-               END IF
-C
-               IF( NAP+IB .GT. NP ) THEN
+               IF( NAP+IB.GT.NP ) THEN
 C
 C                 No sufficient eigenvalues to be assigned.
 C
                   INFO = 3
                ELSE
-                  IF( IB .EQ. 1 ) THEN
+                  IF( IB.EQ.1 ) THEN
 C
 C                    A 1-by-1 block.
 C
@@ -575,7 +560,7 @@ C                       Simple 2-by-2 block with complex eigenvalues.
 C                       Compute the eigenvalues of the last block.
 C
                         CALL MB03QY( N, NL, A, LDA, Z, LDZ, X, Y, INFO )
-                        IF( NPC .GT. 1 ) THEN
+                        IF( NPC.GT.1 ) THEN
                            CALL SB01BX( .FALSE., NPC, X, Y,
      $                                  WR(IPC), WI(IPC), S, P )
                            NPC  = NPC - 2
@@ -608,7 +593,7 @@ C                 Form the IBxIB matrix A2 from the current diagonal
 C                 block.
 C
                   A2(1,1) = A(NL,NL)
-                  IF( IB .GT. 1 ) THEN
+                  IF( IB.GT.1 ) THEN
                      A2(1,2) = A(NL,NSUP)
                      A2(2,1) = A(NSUP,NL)
                      A2(2,2) = A(NSUP,NSUP)
@@ -621,7 +606,7 @@ C                 Workspace needed: 5*M.
 C
                   CALL SB01BY( IB, M, S, P, A2, DWORK(KG), DWORK(KFI),
      $                         TOLER, DWORK(KW), IERR )
-                  IF( IERR .NE. 0 ) THEN
+                  IF( IERR.NE.0 ) THEN
                      IF( IB.EQ.1 .OR. SIMPLB ) THEN
 C
 C                       The simple 1x1 block is uncontrollable.
@@ -686,7 +671,7 @@ C
 C
 C                    Try to split the 2x2 block.
 C
-                     IF( IB .EQ. 2 )
+                     IF( IB.EQ.2 )
      $                  CALL MB03QY( N, NL, A, LDA, Z, LDZ, X, Y,
      $                               INFO )
                      NAP = NAP + IB
@@ -703,11 +688,11 @@ C
                         END IF
 C
 C                       WHILE (NMOVES > 0) DO
-   30                   IF( NMOVES .GT. 0 ) THEN
+   30                   IF( NMOVES.GT.0 ) THEN
                            NCUR = NCUR1
 C
 C                          WHILE (NCUR >= NLOW) DO
-   40                      IF( NCUR .GE. NLOW ) THEN
+   40                      IF( NCUR.GE.NLOW ) THEN
 C
 C                             Loop for the last block positioning.
 C
@@ -718,7 +703,7 @@ C
                               CALL DLAEXC( .TRUE., N, A, LDA, Z, LDZ,
      $                                     NCUR-IB1+1, IB1, IB,
      $                                     DWORK(KW), INFO )
-                              IF( INFO .NE. 0 ) THEN
+                              IF( INFO.NE.0 ) THEN
                                  INFO = 2
                                  RETURN
                               END IF
@@ -753,7 +738,7 @@ C
 C
 C     Annihilate the elements below the first subdiagonal of A.
 C
-      IF( N .GT. 2)
+      IF( N.GT.2)
      $   CALL DLASET( 'L', N-2, N-2, ZERO, ZERO, A(3,1), LDA )
       IF( NAP .GT. 0 ) THEN
 C
@@ -761,9 +746,17 @@ C        Move the assigned eigenvalues in the first NAP positions of
 C        WR and WI.
 C
          K = IPC - NPR - 1
-         IF( K .GT. 0 ) CALL DSWAP( K, WR(NPR+1), 1, WR, 1 )
+         IF( K.GT.0 ) THEN
+            IF( K.LE.NPR ) THEN
+               CALL DSWAP( K, WR(NPR+1), 1, WR, 1 )
+            ELSE
+               CALL DCOPY( K, WR(NPR+1), 1, DWORK, 1 )
+               CALL DCOPY( NPR, WR, 1, DWORK(K+1), 1 )
+               CALL DCOPY( K+NPR, DWORK, 1, WR, 1 )
+            END IF
+         END IF
          J = NAP - K
-         IF( J .GT. 0 ) THEN
+         IF( J.GT.0 ) THEN
             CALL DSWAP( J, WR(IPC+NPC), 1, WR(K+1), 1 )
             CALL DSWAP( J, WI(IPC+NPC), 1, WI(K+1), 1 )
          END IF

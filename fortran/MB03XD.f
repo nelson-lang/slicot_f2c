@@ -2,24 +2,6 @@
      $                   T, LDT, U1, LDU1, U2, LDU2, V1, LDV1, V2, LDV2,
      $                   WR, WI, ILO, SCALE, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the eigenvalues of a Hamiltonian matrix,
@@ -37,7 +19,7 @@ C     Schur decompositions as described in [1],
 C
 C           T       [  T   G  ]
 C          U H V =  [       T ],                                    (2)
-C                   [  0  -S  ]
+C                   [  0   S  ]
 C
 C     where U and V are 2n-by-2n orthogonal symplectic matrices,
 C     S is in real Schur form and T is upper triangular.
@@ -167,12 +149,10 @@ C     WR      (output) DOUBLE PRECISION array, dimension (N)
 C     WI      (output) DOUBLE PRECISION array, dimension (N)
 C             On exit, the leading N elements of WR and WI contain the
 C             real and imaginary parts, respectively, of N eigenvalues
-C             that have nonpositive real part. Complex conjugate pairs
-C             of eigenvalues with real part not equal to zero will
-C             appear consecutively with the eigenvalue having the
-C             positive imaginary part first. For complex conjugate pairs
-C             of eigenvalues on the imaginary axis only the eigenvalue
-C             having nonnegative imaginary part will be returned.
+C             that have nonnegative imaginary part. Their complex
+C             conjugate eigenvalues are not stored. If imaginary parts
+C             are zero (i.e., for real eigenvalues), only positive
+C             eigenvalues are stored.
 C
 C     ILO     (output) INTEGER
 C             ILO is an integer value determined when H was balanced.
@@ -181,8 +161,8 @@ C             The balanced Q(i,j) = 0 if J = 1,...,ILO-1 or
 C             I = 1,...,ILO-1.
 C
 C     SCALE   (output) DOUBLE PRECISION array, dimension (N)
-C             On exit, if SCALE = 'S', the leading N elements of this
-C             array contain details of the permutation and scaling
+C             On exit, if BALANC <> 'N', the leading N elements of this
+C             array contain details of the permutation and/or scaling
 C             factors applied when balancing H, see MB04DD.
 C             This array is not referenced if BALANC = 'N'.
 C
@@ -190,12 +170,13 @@ C     Workspace
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if INFO = 0,  DWORK(1)  returns the optimal
-C             value of LDWORK.
+C             value of LDWORK, and   DWORK(2)  returns the 1-norm of the
+C             scaled (if BALANC = 'S' or 'B') Hamiltonian matrix.
 C             On exit, if  INFO = -25,  DWORK(1)  returns the minimum
 C             value of LDWORK.
 C
 C     LDWORK  (input) INTEGER
-C             The dimension of the array DWORK. LDWORK >= max( 1, 8*N ).
+C             The dimension of the array DWORK. LDWORK >= max( 2, 8*N ).
 C             Moreover:
 C             If JOB = 'E' or 'S' and JOBU = 'N' and JOBV = 'N',
 C                LDWORK >= 7*N+N*N.
@@ -208,6 +189,12 @@ C                LDWORK >= 7*N+2*N*N.
 C             If JOB = 'G' and JOBU = 'U' and JOBV = 'V',
 C                LDWORK >= 7*N+N*N.
 C             For good performance, LDWORK must generally be larger.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -240,6 +227,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, May 2008 (SLICOT version of the HAPACK routine DHAESU).
+C     V. Sima, Aug. 2011, Oct. 2011, July 2012, Mar. 2015, May 2015.
 C
 C     KEYWORDS
 C
@@ -248,8 +236,8 @@ C
 C     ******************************************************************
 C
 C     .. Parameters ..
-      DOUBLE PRECISION   ZERO, ONE
-      PARAMETER          ( ZERO = 0.0D0, ONE = 1.0D0 )
+      DOUBLE PRECISION   ZERO, ONE, TWO
+      PARAMETER          ( ZERO = 0.0D0, ONE = 1.0D0, TWO = 2.0D0 )
 C     .. Scalar Arguments ..
       CHARACTER          BALANC, JOB, JOBU, JOBV
       INTEGER            ILO, INFO, LDA, LDQG, LDT, LDU1, LDU2, LDV1,
@@ -260,12 +248,12 @@ C     .. Array Arguments ..
      $                   V2(LDV2,*), WI(*), WR(*)
 C     .. Local Scalars ..
       CHARACTER          UCHAR, VCHAR
-      LOGICAL            LPERM, LSCAL, SCALEH, WANTG, WANTS, WANTU,
-     $                   WANTV
+      LOGICAL            LPERM, LQUERY, LSCAL, SCALEH, WANTG, WANTS,
+     $                   WANTU, WANTV
       INTEGER            I, IERR, ILO1, J, K, L, PBETA, PCSL, PCSR, PDW,
      $                   PQ, PTAUL, PTAUR, PZ, WRKMIN, WRKOPT
-      DOUBLE PRECISION   BIGNUM, CSCALE, EPS, HNRM, SMLNUM, TEMP, TEMPI,
-     $                   TEMPR
+      DOUBLE PRECISION   BIGNUM, CSCALE, EPS, HNR1, HNRM, SMLNUM, TEMP,
+     $                   TEMPI, TEMPR
 C     .. External Functions ..
       LOGICAL            LSAME
       DOUBLE PRECISION   DLAMCH, MA02ID
@@ -275,7 +263,7 @@ C     .. External Subroutines ..
      $                   DSCAL, MA01AD, MB03XP, MB04DD, MB04QB, MB04TB,
      $                   XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC          ABS, DBLE, MAX, SQRT
+      INTRINSIC          ABS, DBLE, INT, MAX, SQRT
 C
 C     .. Executable Statements ..
 C
@@ -290,36 +278,20 @@ C
       WANTV = LSAME( JOBV, 'V' )
 C
       IF ( WANTG ) THEN
-         IF ( WANTU ) THEN
-            IF ( WANTV ) THEN
-               WRKMIN = MAX( 1, 7*N+N*N )
-            ELSE
-               WRKMIN = MAX( 1, 7*N+2*N*N )
-            END IF
+         IF ( WANTU .AND. WANTV ) THEN
+            WRKMIN = MAX( 2, 7*N + N*N )
+         ELSE IF ( .NOT.WANTU .AND. .NOT.WANTV ) THEN
+            WRKMIN = MAX( 2, 7*N + N*N, 2*N + 3*N*N )
          ELSE
-            IF ( WANTV ) THEN
-               WRKMIN = MAX( 1, 7*N+2*N*N )
-            ELSE
-               WRKMIN = MAX( 1, 7*N+N*N, 2*N+3*N*N )
-            END IF
+            WRKMIN = MAX( 2, 7*N + 2*N*N )
          END IF
       ELSE
-         IF ( WANTU ) THEN
-            IF ( WANTV ) THEN
-               WRKMIN = MAX( 1, 8*N )
-            ELSE
-               WRKMIN = MAX( 1, 8*N )
-            END IF
+         IF ( .NOT.WANTU .AND. .NOT.WANTV ) THEN
+            WRKMIN = MAX( 2, 7*N + N*N )
          ELSE
-            IF ( WANTV ) THEN
-               WRKMIN = MAX( 1, 8*N )
-            ELSE
-               WRKMIN = MAX( 1, 7*N+N*N )
-            END IF
+            WRKMIN = MAX( 2, 8*N )
          END IF
       END IF
-C
-      WRKOPT = WRKMIN
 C
 C     Test the scalar input parameters.
 C
@@ -348,9 +320,46 @@ C
          INFO = -17
       ELSE IF ( LDV2.LT.1 .OR. ( WANTV .AND. LDV2.LT.N ) ) THEN
          INFO = -19
-      ELSE IF ( LDWORK.LT.WRKMIN ) THEN
-         INFO = -25
-         DWORK(1) = DBLE( WRKMIN )
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF ( LQUERY ) THEN
+            IF ( N.EQ.0 ) THEN
+               WRKOPT = TWO
+            ELSE
+               PTAUR = 5*N
+               PDW   = PTAUR + N
+               IF ( .NOT.WANTU .AND. .NOT.WANTV  )
+     $            PDW  = PDW + N*N
+               CALL MB04TB( 'No Transpose', 'Transpose', N, N, DWORK,
+     $                      LDT, DWORK, LDT, DWORK, LDT, DWORK, LDT,
+     $                      DWORK, DWORK, DWORK, DWORK, DWORK, -1,
+     $                      IERR )
+               WRKOPT = MAX( WRKMIN, INT( DWORK(1) ) + PDW )
+C
+               IF ( WANTU .OR. WANTV ) THEN
+                  IF ( .NOT.WANTG ) THEN
+                     PDW = PTAUR + N
+                     IF ( WANTU .AND. WANTV )
+     $                  PDW = PDW + N
+                  ELSE
+                     PDW = PTAUR + N*N
+                     IF ( .NOT.WANTU .AND. WANTV )
+     $                  PDW = PDW + 2*N
+                  END IF
+                  CALL MB04QB( 'No Transpose', 'No Transpose',
+     $                          'No Transpose','Columnwise',
+     $                         'Columnwise', N, N, N, DWORK, LDT, DWORK,
+     $                         LDT, DWORK, LDT, DWORK, LDT, DWORK,
+     $                         DWORK, DWORK, -1, IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW )
+               END IF
+            END IF
+            DWORK(1) = DBLE( WRKOPT )
+            RETURN
+         ELSE IF ( LDWORK.LT.WRKMIN ) THEN
+            DWORK(1) = DBLE( WRKMIN )
+            INFO = -25
+         END IF
       END IF
 C
 C     Return if there were illegal values.
@@ -363,8 +372,11 @@ C
 C     Quick return if possible.
 C
       ILO = 0
-      IF( N.EQ.0 )
-     $   RETURN
+      IF( N.EQ.0 ) THEN
+         DWORK(1) = TWO
+         DWORK(2) = ZERO
+         RETURN
+      END IF
 C
       EPS = DLAMCH( 'P' )
       SMLNUM = DLAMCH( 'S' )
@@ -391,9 +403,15 @@ C
      $               IERR )
       END IF
 C
-C     Balance the matrix.
+C     Balance the matrix and compute the 1-norm.
 C
-      CALL MB04DD( BALANC, N, A, LDA, QG, LDQG, ILO, SCALE, IERR )
+      IF ( LPERM .OR. LSCAL ) THEN
+         CALL MB04DD( BALANC, N, A, LDA, QG, LDQG, ILO, SCALE, IERR )
+      ELSE
+         ILO = 1
+      END IF
+      HNR1 = MA02ID( 'Hamiltonian', '1-norm', N, A, LDA, QG, LDQG,
+     $               DWORK )
 C
 C     Copy A to T and multiply A by -1.
 C
@@ -463,17 +481,17 @@ C
    80 CONTINUE
 C
       IF ( .NOT.WANTU .AND. .NOT.WANTV  ) THEN
-         CALL MB04TB( 'Not Transposed', 'Transposed', N, ILO, T, LDT, A,
+         CALL MB04TB( 'No Transpose', 'Transpose', N, ILO, T, LDT, A,
      $                LDA, QG(1,2), LDQG, DWORK(PQ), N, DWORK(PCSL),
      $                DWORK(PCSR), DWORK(PTAUL), DWORK(PTAUR),
      $                DWORK(PDW), LDWORK-PDW+1, IERR )
       ELSE IF ( WANTU ) THEN
-         CALL MB04TB( 'Not Transposed', 'Transposed', N, ILO, T, LDT, A,
+         CALL MB04TB( 'No Transpose', 'Transpose', N, ILO, T, LDT, A,
      $                LDA, QG(1,2), LDQG, U2, LDU2, DWORK(PCSL),
      $                DWORK(PCSR), DWORK(PTAUL), DWORK(PTAUR),
      $                DWORK(PDW), LDWORK-PDW+1, IERR )
       ELSE
-         CALL MB04TB( 'Not Transposed', 'Transposed', N, ILO, T, LDT, A,
+         CALL MB04TB( 'No Transpose', 'Transpose', N, ILO, T, LDT, A,
      $                LDA, QG(1,2), LDQG, V2, LDV2, DWORK(PCSL),
      $                DWORK(PCSR), DWORK(PTAUL), DWORK(PTAUR),
      $                DWORK(PDW), LDWORK-PDW+1, IERR )
@@ -546,7 +564,7 @@ C
      $      GO TO 90
          WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
 C
-      ELSE IF ( .NOT.WANTU .AND. .NOT.WANTV .AND. WANTG ) THEN
+      ELSE IF ( .NOT.WANTU .AND. .NOT.WANTV ) THEN
 C
 C        Workspace requirements: 3*N*N + 2*N.
 C
@@ -563,7 +581,7 @@ C
      $               DWORK(PZ), N, QG(1,2), LDQG, ZERO, DWORK(PDW), N )
          CALL DGEMM( 'No Transpose', 'No Transpose', N, N, N, ONE,
      $               DWORK(PDW), N, DWORK(PQ), N, ZERO, QG(1,2), LDQG )
-      ELSE IF ( WANTU .AND. .NOT.WANTV .AND. WANTG ) THEN
+      ELSE IF ( WANTU .AND. .NOT.WANTV ) THEN
 C
 C        Workspace requirements: 2*N*N + 7*N.
 C
@@ -585,7 +603,7 @@ C
          CALL DGEMM( 'No Transpose', 'No Transpose', N, N, N, ONE,
      $               DWORK(PDW), N, DWORK(PQ), N, ZERO, QG(1,2), LDQG )
 C
-      ELSE IF ( .NOT.WANTU .AND. WANTV .AND. WANTG ) THEN
+      ELSE IF ( .NOT.WANTU .AND. WANTV ) THEN
 C
 C        Workspace requirements: 2*N*N + 7*N
 C
@@ -607,7 +625,7 @@ C
          CALL DGEMM( 'No Transpose', 'No Transpose', N, N, N, ONE,
      $               DWORK(PDW), N, V1, LDV1, ZERO, QG(1,2), LDQG )
 C
-      ELSE IF ( WANTU .AND. WANTV .AND. WANTG ) THEN
+      ELSE
 C
 C        Workspace requirements: N*N + 7*N.
 C
@@ -626,7 +644,7 @@ C
          IF ( N.GT.2 )
      $      CALL DLACPY( 'Lower', N-2, N-2, V2(3,1), LDV2, A(3,1), LDA )
          CALL DGEMM( 'Transpose', 'No Transpose', N, N, N, ONE,
-     $                   U1, LDU1, QG(1,2), LDQG, ZERO, DWORK(PDW), N )
+     $               U1, LDU1, QG(1,2), LDQG, ZERO, DWORK(PDW), N )
          CALL DGEMM( 'No Transpose', 'No Transpose', N, N, N, ONE,
      $               DWORK(PDW), N, V1, LDV1, ZERO, QG(1,2), LDQG )
       END IF
@@ -635,7 +653,10 @@ C
 C
 C     Compute square roots of eigenvalues and rescale.
 C
-      DO 100 I = INFO + 1, N
+      I = INFO + 1
+C     WHILE I <= N
+  100 CONTINUE
+      IF ( I.LE.N ) THEN
          TEMPR = WR(I)
          TEMPI = WI(I)
          TEMP  = DWORK(PBETA + I - 1)
@@ -645,21 +666,27 @@ C
          IF ( TEMPI.EQ.ZERO ) THEN
             IF ( TEMPR.LT.ZERO ) THEN
                WR(I) = ZERO
-               WI(I) =  SQRT( TEMP ) * SQRT( -TEMPR )
+               WI(I) = SQRT( TEMP ) * SQRT( -TEMPR )
             ELSE
-               WR(I) = -SQRT( TEMP ) * SQRT(  TEMPR )
+               WR(I) = SQRT( TEMP ) * SQRT(  TEMPR )
                WI(I) = ZERO
             END IF
+            I = I + 1
          ELSE
             CALL MA01AD( TEMPR, TEMPI, WR(I), WI(I) )
-            WR(I) = -WR(I) * SQRT( TEMP )
-            IF ( TEMP.GT.0 ) THEN
+            WR(I) = WR(I) * SQRT( TEMP )
+            IF ( TEMP.GT.ZERO ) THEN
                WI(I) = WI(I) * SQRT( TEMP )
             ELSE
                WI(I) = ZERO
             END IF
+            WR(I+1) = -WR(I)
+            WI(I+1) =  WI(I)
+            I = I + 2
          END IF
-  100 CONTINUE
+         GO TO 100
+C        END WHILE
+      END IF
 C
       IF ( SCALEH ) THEN
 C
@@ -673,10 +700,17 @@ C
      $                   LDQG, IERR )
          CALL DLASCL( 'General', 0, 0, CSCALE, HNRM, N, 1, WR, N, IERR )
          CALL DLASCL( 'General', 0, 0, CSCALE, HNRM, N, 1, WI, N, IERR )
-      END IF
+         HNR1 = HNR1 * HNRM / CSCALE
+      END IF 
 C
       IF ( INFO.NE.0 )
      $   RETURN
+C
+      IF ( ILO.GT.N ) THEN
+         DWORK(1) = DBLE( WRKOPT )
+         DWORK(2) = HNR1
+         RETURN
+      END IF 
 C
 C     -----------------------------------------------
 C     Step 3:  Compute orthogonal symplectic factors.
@@ -716,9 +750,9 @@ C
          PDW = PTAUR + N
          CALL DLASET( 'All', N, N, ZERO, ZERO, V2, LDV2 )
          CALL MB04QB( 'No Transpose', 'No Transpose', 'No Transpose',
-     $                'Columnwise', 'Rowwise', MAX(0,N-ILO), N,
-     $                MAX(0,N-ILO), QG(ILO1,ILO), LDQG, QG(ILO,ILO1),
-     $                LDQG, V1(ILO1,1), LDV1, V2(ILO1,1), LDV2,
+     $                'Columnwise', 'Rowwise', N-ILO, N, N-ILO,
+     $                QG(ILO1,ILO), LDQG, QG(ILO,ILO1), LDQG,
+     $                V1(ILO1,1), LDV1, V2(ILO1,1), LDV2,
      $                DWORK(PCSR+2*ILO-2), DWORK(PTAUR+ILO-1),
      $                DWORK(PDW), LDWORK-PDW+1, IERR )
          WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
@@ -732,9 +766,9 @@ C
          CALL DLACPY( 'Lower', N, N, V2, LDV2, T, LDT )
          CALL DLASET( 'All', N, N, ZERO, ZERO, V2, LDV2 )
          CALL MB04QB( 'No Transpose', 'No Transpose', 'No Transpose',
-     $                'Columnwise', 'Rowwise', MAX(0,N-ILO), N,
-     $                MAX(0,N-ILO), QG(ILO1,ILO), LDQG, U2(ILO,ILO1),
-     $                LDU2, V1(ILO1,1), LDV1, V2(ILO1,1), LDV2,
+     $                'Columnwise', 'Rowwise', N-ILO, N, N-ILO,
+     $                QG(ILO1,ILO), LDQG, U2(ILO,ILO1), LDU2,
+     $                V1(ILO1,1), LDV1, V2(ILO1,1), LDV2,
      $                DWORK(PCSR+2*ILO-2), DWORK(PTAUR+ILO-1),
      $                DWORK(PDW+N), LDWORK-PDW-N+1, IERR )
          WRKOPT = MAX( WRKOPT, INT( DWORK(PDW+N) ) + PDW + N - 1 )
@@ -774,17 +808,16 @@ C
 C
 C        Workspace requirements: 7*N + N*N.
 C
-         PQ  = PTAUR+N
+         PQ  = PTAUR + N
          PDW = PQ + N*N
          CALL DLACPY( 'Upper', N, N, V2, LDV2, DWORK(PQ), N )
          CALL DLASET( 'All', N, N, ZERO, ZERO, V2, LDV2 )
          CALL MB04QB( 'No Transpose', 'No Transpose', 'No Transpose',
-     $                'Columnwise', 'Rowwise', MAX(0,N-ILO), N,
-     $                MAX(0,N-ILO), A(ILO1,ILO), LDA,
-     $                DWORK(PQ+ILO*N+ILO-1), N, V1(ILO1,1), LDV1,
-     $                V2(ILO1,1), LDV2, DWORK(PCSR+2*ILO-2),
-     $                DWORK(PTAUR+ILO-1), DWORK(PDW+N),
-     $                LDWORK-PDW-N+1, IERR )
+     $                'Columnwise', 'Rowwise', N-ILO, N, N-ILO,
+     $                A(ILO1,ILO), LDA, DWORK(PQ+ILO*N+ILO-1),
+     $                N, V1(ILO1,1), LDV1, V2(ILO1,1), LDV2,
+     $                DWORK(PCSR+2*ILO-2), DWORK(PTAUR+ILO-1),
+     $                DWORK(PDW+N), LDWORK-PDW-N+1, IERR )
          WRKOPT = MAX( WRKOPT, INT( DWORK(PDW+N) ) + PDW + N - 1 )
          IF ( N.GT.2 )
      $      CALL DLASET( 'Lower', N-2, N-2, ZERO, ZERO, A(3,1), LDA )
@@ -796,11 +829,11 @@ C
          PDW = PTAUR + N
          CALL DLASET( 'All', N, N, ZERO, ZERO, V2, LDV2 )
          CALL MB04QB( 'No Transpose', 'No Transpose', 'No Transpose',
-     $                'Columnwise', 'Rowwise', MAX(0,N-ILO), N,
-     $                MAX(0,N-ILO), A(ILO1,ILO), LDA, U2(ILO,ILO1),
-     $                LDU2, V1(ILO1,1), LDV1, V2(ILO1,1), LDV2,
-     $                DWORK(PCSR+2*ILO-2), DWORK(PTAUR+ILO-1),
-     $                DWORK(PDW), LDWORK-PDW+1, IERR )
+     $                'Columnwise', 'Rowwise', N-ILO, N, N-ILO,
+     $                A(ILO1,ILO), LDA, U2(ILO,ILO1), LDU2, V1(ILO1,1),
+     $                LDV1, V2(ILO1,1), LDV2, DWORK(PCSR+2*ILO-2),
+     $                DWORK(PTAUR+ILO-1), DWORK(PDW), LDWORK-PDW+1,
+     $                IERR )
          WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
 C
          PQ  = PTAUR
@@ -821,6 +854,7 @@ C
       END IF
 C
       DWORK(1) = DBLE( WRKOPT )
+      DWORK(2) = HNR1
       RETURN
 C *** Last line of MB03XD ***
       END

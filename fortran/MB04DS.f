@@ -1,23 +1,5 @@
       SUBROUTINE MB04DS( JOB, N, A, LDA, QG, LDQG, ILO, SCALE, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To balance a real skew-Hamiltonian matrix
@@ -31,7 +13,7 @@ C     matrices. This involves, first, permuting S by a symplectic
 C     similarity transformation to isolate eigenvalues in the first
 C     1:ILO-1 elements on the diagonal of A; and second, applying a
 C     diagonal similarity transformation to rows and columns
-C     ILO:2*N-ILO+1 to make the rows and columns as close in 1-norm
+C     ILO:N, N+ILO:2*N to make the rows and columns as close in 1-norm
 C     as possible. Both steps are optional.
 C
 C     ARGUMENTS
@@ -55,14 +37,14 @@ C             On entry, the leading N-by-N part of this array must
 C             contain the matrix A.
 C             On exit, the leading N-by-N part of this array contains
 C             the matrix A of the balanced skew-Hamiltonian. In
-C             particular, the lower triangular part of the first ILO-1
-C             columns of A is zero.
+C             particular, the strictly lower triangular part of the
+C             first ILO-1 columns of A is zero.
 C
 C     LDA     INTEGER
 C             The leading dimension of the array A.  LDA >= MAX(1,N).
 C
 C     QG      (input/output) DOUBLE PRECISION array, dimension
-C                            (LDQG,N)
+C                            (LDQG,N+1)
 C             On entry, the leading N-by-N+1 part of this array must
 C             contain in columns 1:N the strictly lower triangular part
 C             of the matrix Q and in columns 2:N+1 the strictly upper
@@ -104,7 +86,7 @@ C     REFERENCES
 C
 C     [1] Benner, P.
 C         Symplectic balancing of Hamiltonian matrices.
-C         SIAM J. Sci. Comput., 22 (5), pp. 1885-1904, 2000.
+C         SIAM J. Sci. Comput., 22 (5), pp. 1885-1904, 2001.
 C
 C     CONTRIBUTORS
 C
@@ -114,6 +96,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DSHBAL).
+C     V. Sima, Oct. 2012, Mar. 2016.
 C
 C     KEYWORDS
 C

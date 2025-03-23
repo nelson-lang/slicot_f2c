@@ -3,24 +3,6 @@
      $                   ALPHAR, ALPHAI, BETA, IWORK, DWORK, LDWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve for X either the generalized continuous-time Lyapunov
@@ -203,6 +185,12 @@ C                    'B', 'S'   'N'     |  MAX(1,2*N**2,4*N)
 C
 C             For optimum performance, LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed; the
+C             routine only calculates the optimal size of the DWORK
+C             array, returns this value as the first entry of the DWORK
+C             array, and no error message related to LDWORK is issued by
+C             XERBLA.
+C
 C     Error indicator
 C
 C     INFO    INTEGER
@@ -214,7 +202,7 @@ C                   Hessenberg part of the array A is not in upper
 C                   quasitriangular form;
 C             = 2:  FACT = 'N' and the pencil A - lambda * E cannot be
 C                   reduced to generalized Schur form: LAPACK routine
-C                   DGEGS has failed to converge;
+C                   DGEGS (or DGGES) has failed to converge;
 C             = 3:  DICO = 'D' and the pencil A - lambda * E has a
 C                   pair of reciprocal eigenvalues. That is, lambda_i =
 C                   1/lambda_j for some i and j, where lambda_i and
@@ -360,8 +348,7 @@ C     T. Penzl, Technical University Chemnitz, Germany, Aug. 1998.
 C
 C     REVISIONS
 C
-C     Sep. 1998 (V. Sima).
-C     Dec. 1998 (V. Sima).
+C     V. Sima, Sep. 1998, Dec. 1998, July 2011, Oct. 2017, May 2020.
 C
 C     KEYWORDS
 C
@@ -384,16 +371,19 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       CHARACTER         ETRANS
       DOUBLE PRECISION  EST, EPS, NORMA, NORME, SCALE1
-      INTEGER           I, INFO1, KASE, MINWRK, OPTWRK
-      LOGICAL           ISDISC, ISFACT, ISTRAN, ISUPPR, WANTBH, WANTSP,
-     $                  WANTX
+      INTEGER           I, INFO1, KASE, MINGG, MINWRK, OPTWRK
+      LOGICAL           ISDISC, ISFACT, ISTRAN, ISUPPR, LQUERY, WANTBH,
+     $                  WANTSP, WANTX
+C     .. Local Arrays ..
+      LOGICAL           BWORK(1)
+      INTEGER           ISAVE( 3 )
 C     .. External Functions ..
       DOUBLE PRECISION  DLAMCH, DNRM2
-      LOGICAL           LSAME
-      EXTERNAL          DLAMCH, DNRM2, LSAME
+      LOGICAL           DELCTG, LSAME
+      EXTERNAL          DELCTG, DLAMCH, DNRM2, LSAME
 C     .. External Subroutines ..
-      EXTERNAL          DCOPY, DGEGS, DLACON, MB01RD, MB01RW, SG03AX,
-     $                  SG03AY, XERBLA
+      EXTERNAL          DCOPY, DGEGS, DGGES, DLACN2, MB01RD, MB01RW,
+     $                  SG03AX, SG03AY, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC         DBLE, INT, MAX, MIN
 C     .. Executable Statements ..
@@ -407,9 +397,11 @@ C
       ISFACT = LSAME( FACT,  'F' )
       ISTRAN = LSAME( TRANS, 'T' )
       ISUPPR = LSAME( UPLO,  'U' )
+      LQUERY = LDWORK.EQ.-1
 C
 C     Check the scalar input parameters.
 C
+      INFO = 0
       IF ( .NOT.( ISDISC .OR. LSAME( DICO,  'C' ) ) ) THEN
          INFO = -1
       ELSEIF ( .NOT.( WANTX .OR. WANTSP .OR. WANTBH ) ) THEN
@@ -433,11 +425,8 @@ C
       ELSEIF ( LDX .LT. MAX( 1, N ) ) THEN
          INFO = -16
       ELSE
-         INFO = 0
-      END IF
-      IF ( INFO .EQ. 0 ) THEN
 C
-C        Compute minimal workspace.
+C        Compute minimal and optimal workspace.
 C
          IF ( WANTX ) THEN
             IF ( ISFACT ) THEN
@@ -452,12 +441,26 @@ C
                MINWRK = MAX( 2*N*N, 4*N, 1 )
             END IF
          END IF
-         IF ( MINWRK .GT. LDWORK ) THEN
+         MINGG = MAX( MINWRK, 8*N + 16 )
+         IF( LQUERY ) THEN
+            IF ( ISFACT ) THEN
+               OPTWRK = MINGG
+            ELSE
+               CALL DGGES( 'Vectors', 'Vectors', 'Not ordered', DELCTG,
+     $                     N, A, LDA, E, LDE, I, ALPHAR, ALPHAI, BETA,
+     $                     Q, LDQ, Z, LDZ, DWORK, -1, BWORK, INFO1 )
+               OPTWRK = MAX( MINGG, INT( DWORK(1) ), N*N )
+            END IF
+         ELSE IF ( MINWRK .GT. LDWORK ) THEN
             INFO = -25
          END IF
       END IF
+C
       IF ( INFO .NE. 0 ) THEN
          CALL XERBLA( 'SG03AD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = OPTWRK
          RETURN
       END IF
 C
@@ -490,18 +493,31 @@ C
 C           A := Q**T * A * Z   (upper quasitriangular)
 C           E := Q**T * E * Z   (upper triangular)
 C
-C        ( Workspace: >= MAX(1,4*N) )
+         IF ( LDWORK .LT. MINGG ) THEN
 C
-         CALL DGEGS( 'Vectors', 'Vectors', N, A, LDA, E, LDE, ALPHAR,
-     $               ALPHAI, BETA, Q, LDQ, Z, LDZ, DWORK, LDWORK,
-     $               INFO1 )
+C           Use DGEGS for backward compatibilty with LDWORK value.
+C           ( Workspace: >= MAX(1,4*N) )
+C
+            CALL DGEGS( 'Vectors', 'Vectors', N, A, LDA, E, LDE, ALPHAR,
+     $                  ALPHAI, BETA, Q, LDQ, Z, LDZ, DWORK, LDWORK,
+     $                  INFO1 )
+         ELSE
+C
+C           Use DGGES. The workspace is increased to avoid an error
+C           return, while it should not really be larger than above.
+C           ( Workspace: >= MAX(1,8*N+16) )
+C
+            CALL DGGES( 'Vectors', 'Vectors', 'Not ordered', DELCTG, N,
+     $                  A, LDA, E, LDE, I, ALPHAR, ALPHAI, BETA, Q, LDQ,
+     $                  Z, LDZ, DWORK, LDWORK, BWORK, INFO1 )
+         END IF
          IF ( INFO1 .NE. 0 ) THEN
             INFO = 2
             RETURN
          END IF
          OPTWRK = INT( DWORK(1) )
       ELSE
-         OPTWRK = MINWRK
+         OPTWRK = 0
       END IF
 C
       IF ( WANTBH .OR. WANTX ) THEN
@@ -590,7 +606,8 @@ C
          EST = ZERO
          KASE = 0
    80    CONTINUE
-         CALL DLACON( N*N, DWORK(N*N+1), DWORK, IWORK, EST, KASE )
+         CALL DLACN2( N*N, DWORK(N*N+1), DWORK, IWORK, EST, KASE, ISAVE
+     $              )
          IF ( KASE .NE. 0 ) THEN
             IF ( ( KASE.EQ.1 .AND. .NOT.ISTRAN ) .OR.
      $           ( KASE.NE.1 .AND. ISTRAN ) ) THEN

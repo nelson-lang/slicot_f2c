@@ -2,24 +2,6 @@
      $                   LDC, SCALE, SEP, FERR, WR, WI, IWORK, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve for X either the real continuous-time Lyapunov equation
@@ -120,7 +102,7 @@ C             If JOB = 'S' or JOB = 'B', and INFO = 0 or INFO = N+1, SEP
 C             contains the estimated separation of the matrices op(A)
 C             and -op(A)', if DICO = 'C' or of op(A) and op(A)', if
 C             DICO = 'D'.
-C             If JOB = 'X' or N = 0, SEP is not referenced.
+C             If JOB = 'X', SEP is not referenced.
 C
 C     FERR    (output) DOUBLE PRECISION
 C             If JOB = 'B', and INFO = 0 or INFO = N+1, FERR contains an
@@ -158,6 +140,12 @@ C                               LDWORK >= 2*N*N + 2*N, for DICO = 'D'.
 C                If FACT = 'N', LDWORK >= MAX(2*N*N, 3*N), DICO = 'C';
 C                               LDWORK >= 2*N*N + 2*N, for DICO = 'D'.
 C             For optimum performance LDWORK should be larger.
+C
+C             If LDWORK = -1, then a workspace query is assumed; the
+C             routine only calculates the optimal size of the DWORK
+C             array, returns this value as the first entry of the DWORK
+C             array, and no error message related to LDWORK is issued by
+C             XERBLA.
 C
 C     Error Indicator
 C
@@ -324,6 +312,8 @@ C
 C     REVISIONS
 C
 C     V. Sima, Katholieke Univ. Leuven, Belgium, May 1999.
+C     V. Sima, Research Institute for Informatics, Bucharest, July 2011,
+C     Dec. 2016, May 2020.
 C
 C     KEYWORDS
 C
@@ -344,18 +334,20 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A( LDA, * ), C( LDC, * ), DWORK( * ),
      $                  U( LDU, * ), WI( * ), WR( * )
 C     .. Local Scalars ..
-      LOGICAL           CONT, NOFACT, NOTA, WANTBH, WANTSP, WANTX
+      LOGICAL           CONT, LQUERY, NOFACT, NOTA, WANTBH, WANTSP,
+     $                  WANTX
       CHARACTER         NOTRA, NTRNST, TRANST, UPLO
       INTEGER           I, IERR, KASE, LWA, MINWRK, NN, NN2, SDIM
       DOUBLE PRECISION  EPS, EST, SCALEF
 C     .. Local Arrays ..
       LOGICAL           BWORK( 1 )
+      INTEGER           ISAVE( 3 )
 C     .. External Functions ..
       LOGICAL           LSAME, SELECT
       DOUBLE PRECISION  DLAMCH, DLANHS
       EXTERNAL          DLAMCH, DLANHS, LSAME, SELECT
 C     .. External Subroutines ..
-      EXTERNAL          DCOPY, DGEES, DLACON, MB01RD, SB03MX, SB03MY,
+      EXTERNAL          DCOPY, DGEES, DLACN2, MB01RD, SB03MX, SB03MY,
      $                  XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC         DBLE, INT, MAX
@@ -369,6 +361,7 @@ C
       WANTBH = LSAME( JOB,   'B' )
       NOFACT = LSAME( FACT,  'N' )
       NOTA   = LSAME( TRANA, 'N' )
+      LQUERY = LDWORK.EQ.-1
       NN  = N*N
       NN2 = 2*NN
 C
@@ -411,8 +404,19 @@ C
                MINWRK = NN2 + 2*N
             END IF
          END IF
-         IF( LDWORK.LT.MAX( 1, MINWRK ) )
-     $      INFO = -19
+         MINWRK = MAX( 1, MINWRK )
+         IF( LQUERY ) THEN
+            IF( NOFACT ) THEN
+               CALL DGEES( 'Vectors', 'Not ordered', SELECT, N, A, LDA,
+     $                     SDIM, WR, WI, U, LDU, DWORK, -1, BWORK,
+     $                     INFO )
+               LWA = MAX( MINWRK, INT( DWORK( 1 ) ) )
+            ELSE
+               LWA = MINWRK
+            END IF
+         ELSE IF( LDWORK.LT.MINWRK ) THEN
+            INFO = -19
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -421,12 +425,17 @@ C        Error return.
 C
          CALL XERBLA( 'SB03MD', -INFO )
          RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = LWA
+         RETURN
       END IF
 C
 C     Quick return if possible.
 C
       IF( N.EQ.0 ) THEN
          SCALE = ONE
+         IF( .NOT.WANTX )
+     $      SEP   = ZERO
          IF( WANTBH )
      $      FERR  = ZERO
          DWORK(1) = ONE
@@ -509,7 +518,7 @@ C
          KASE = 0
 C        REPEAT
    30    CONTINUE
-         CALL DLACON( NN, DWORK(NN+1), DWORK, IWORK, EST, KASE )
+         CALL DLACN2( NN, DWORK(NN+1), DWORK, IWORK, EST, KASE, ISAVE )
          IF( KASE.NE.0 ) THEN
             IF( KASE.EQ.1 ) THEN
                IF( CONT ) THEN

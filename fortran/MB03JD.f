@@ -1,24 +1,6 @@
       SUBROUTINE MB03JD( COMPQ, N, A, LDA, D, LDD, B, LDB, F, LDF, Q,
      $                   LDQ, NEIG, IWORK, LIWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To move the eigenvalues with strictly negative real parts of an
@@ -30,22 +12,22 @@ C       S = (        ), H = (        ),
 C           (  0  A' )      (  0 -B' )
 C
 C     with A upper triangular and B upper quasi-triangular, to the
-C     leading principal subpencil, while keeping the triangular form:
+C     leading principal subpencil, while keeping the triangular form.
+C     The notation M' denotes the transpose of the matrix M.
+C     The matrices S and H are transformed by an orthogonal matrix Q
+C     such that
 C
-C              (  Aout  Dout  )         (  Bout  Fout  )
-C       Sout = (              ), Hout = (              ), where
-C              (    0   Aout' )         (  0    -Bout' )
+C                            (  Aout  Dout  )  
+C       Sout = J Q' J' S Q = (              ),
+C                            (    0   Aout' )  
+C                                                                    (1)
+C                            (  Bout  Fout  )           (  0  I  )
+C       Hout = J Q' J' H Q = (              ), with J = (        ),
+C                            (  0    -Bout' )           ( -I  0  )
 C
-C     Aout is upper triangular and Bout is upper quasi-triangular.
-C     Optionally, if COMPQ = 'I' or COMPQ = 'U', an orthogonal matrix Q
-C     is determined such that the pencil
-C
-C                                                     (  0  I  )
-C       J Q' J' (aS - bH) Q = aSout - bHout, with J = (        ),
-C                                                     ( -I  0  )
-C
-C     keeps the triangular form, but all eigenvalues with strictly
-C     negative real part are in the leading principal subpencil.
+C     where Aout is upper triangular and Bout is upper quasi-triangular.
+C     Optionally, if COMPQ = 'I' or COMPQ = 'U', the orthogonal matrix Q
+C     that fulfills (1), is computed.
 C
 C     ARGUMENTS
 C
@@ -134,7 +116,7 @@ C             Q.
 C             If COMPQ = 'N' this array is not referenced.
 C
 C     LDQ     INTEGER
-C             The leading dimension of of the array Q.
+C             The leading dimension of the array Q.
 C             LDQ >= 1,         if COMPQ = 'N';
 C             LDQ >= MAX(1, N), if COMPQ = 'I' or COMPQ = 'U'.
 C
@@ -214,6 +196,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Aug. 2009; Jan. 2010, Oct. 2010, Nov. 2010.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C
@@ -864,7 +847,7 @@ C
          END IF
 C
 C        Perform eigenvalue exchange.
-C        Workspace: IWRK5 + 22, if SDIM = 4.
+C        Workspace: IWRK5 + 23, if SDIM = 4.
 C
          CALL MB03HD( SDIM, DWORK( IAUPLE ), DIM1, DWORK( IBUPLE ),
      $                DIM1, PAR, DWORK( IQUPLE ), SDIM, DWORK( IWRK5 ),

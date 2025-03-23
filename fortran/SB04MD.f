@@ -1,24 +1,6 @@
       SUBROUTINE SB04MD( N, M, A, LDA, B, LDB, C, LDC, Z, LDZ, IWORK,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve for X the continuous-time Sylvester equation
@@ -92,6 +74,12 @@ C             The length of the array DWORK.
 C             LDWORK = MAX(1, 2*N*N + 8*N, 5*M, N + M).
 C             For optimum performance LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed; the
+C             routine only calculates the optimal size of the DWORK
+C             array, returns this value as the first entry of the DWORK
+C             array, and no error message related to LDWORK is issued by
+C             XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -140,6 +128,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Katholieke Univ. Leuven, Belgium, June 2000, Aug. 2000.
+C     V. Sima, Research Institute for Informatics, Bucharest, July 2011.
 C
 C     KEYWORDS
 C
@@ -157,12 +146,14 @@ C     .. Array Arguments ..
       INTEGER           IWORK(*)
       DOUBLE PRECISION  A(LDA,*), B(LDB,*), C(LDC,*), DWORK(*), Z(LDZ,*)
 C     .. Local Scalars ..
+      LOGICAL           LQUERY
       INTEGER           I, IEIG, IFAIL, IHI, ILO, IND, ITAU, JWORK,
-     $                  SDIM, WRKOPT
-C     .. Local Scalars ..
-      LOGICAL           SELECT
+     $                  MINDW, SDIM, WRKOPT
 C     .. Local Arrays ..
       LOGICAL           BWORK(1)
+C     .. External Functions ..
+      LOGICAL           SELECT
+      EXTERNAL          SELECT
 C     .. External Subroutines ..
       EXTERNAL          DCOPY, DGEES, DGEHRD, DGEMM, DGEMV, DLACPY,
      $                  DORMHR, DSWAP, SB04MU, SB04MY, XERBLA
@@ -170,7 +161,8 @@ C     .. Intrinsic Functions ..
       INTRINSIC         INT, MAX
 C     .. Executable Statements ..
 C
-      INFO = 0
+      INFO   = 0
+      LQUERY = LDWORK.EQ.-1
 C
 C     Test the input scalar arguments.
 C
@@ -186,8 +178,26 @@ C
          INFO = -8
       ELSE IF( LDZ.LT.MAX( 1, M ) ) THEN
          INFO = -10
-      ELSE IF( LDWORK.LT.MAX( 1, 2*N*N + 8*N, 5*M, N + M ) ) THEN
-         INFO = -13
+      ELSE
+         ILO = 1
+         IHI = N
+         MINDW = MAX( 1, 2*N*N + 8*N, 5*M, N + M )
+         IF( LQUERY ) THEN
+            CALL DGEES( 'Vectors', 'Not ordered', SELECT, M, B, LDB,
+     $                  SDIM, DWORK, DWORK, Z, LDZ, DWORK, -1, BWORK,
+     $                  IFAIL )
+            WRKOPT = MAX( MINDW, 2*M + INT( DWORK(1) ) )
+            CALL DGEHRD( N, ILO, IHI, A, LDA, DWORK, DWORK, -1, IFAIL )
+            WRKOPT = MAX( WRKOPT, N + INT( DWORK(1) ) )
+            CALL DORMHR( 'Left', 'Transpose', N, M, ILO, IHI, A, LDA,
+     $                   DWORK, C, LDC, DWORK, -1, IFAIL )
+            WRKOPT = MAX( WRKOPT, N + INT( DWORK(1) ) )
+            CALL DORMHR( 'Left', 'No transpose', N, M, ILO, IHI, A, LDA,
+     $                   DWORK, C, LDC, DWORK, -1, IFAIL )
+            WRKOPT = MAX( WRKOPT, N + INT( DWORK(1) ) )
+         ELSE IF( LDWORK.LT.MINDW ) THEN
+            INFO = -13
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -195,6 +205,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'SB04MD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C
@@ -205,8 +218,6 @@ C
          RETURN
       END IF
 C
-      ILO = 1
-      IHI = N
       WRKOPT = 1
 C
 C     Step 1 : Reduce A to upper Hessenberg and B' to quasi-upper
@@ -342,6 +353,7 @@ C
    80    CONTINUE
       END IF
 C
+      DWORK(1) = WRKOPT
       RETURN
 C *** Last line of SB04MD ***
       END

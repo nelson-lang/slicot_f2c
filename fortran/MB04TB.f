@@ -2,24 +2,6 @@
      $                   Q, LDQ, CSL, CSR, TAUL, TAUR, DWORK, LDWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a symplectic URV (SURV) decomposition of a real
@@ -60,7 +42,7 @@ C             It is assumed that op(A) is already upper triangular,
 C             op(B) is lower triangular and Q is zero in rows and
 C             columns 1:ILO-1. ILO is normally set by a previous call
 C             to MB04DD; otherwise it should be set to 1.
-C             1 <= ILO <= N, if N > 0; ILO=1, if N=0.
+C             1 <= ILO <= N+1, if N > 0; ILO = 1, if N = 0.
 C
 C     A       (input/output) DOUBLE PRECISION array, dimension (LDA,N)
 C             On entry, the leading N-by-N part of this array must
@@ -137,6 +119,12 @@ C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.  LDWORK >= MAX(1,N).
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -147,7 +135,7 @@ C
 C     METHOD
 C
 C     The matrices U and V are represented as products of symplectic
-C     reflectors and Givens rotators
+C     reflectors and Givens rotations
 C
 C     U = diag( HU(1),HU(1) )  GU(1)  diag( FU(1),FU(1) )
 C         diag( HU(2),HU(2) )  GU(2)  diag( FU(2),FU(2) )
@@ -176,7 +164,7 @@ C     w(1:i-1) = 0 and w(i) = 1; w(i+1:n) is stored on exit in
 C     A(i+1:n,i), if op(A) = 'N', and in A(i,i+1:n), otherwise. The
 C     scalar nu is stored in TAUL(i).
 C
-C     Each GU(i) is a Givens rotator acting on rows i and n+i,
+C     Each GU(i) is a Givens rotation acting on rows i and n+i,
 C     where the cosine is stored in CSL(2*i-1) and the sine in
 C     CSL(2*i).
 C
@@ -197,7 +185,7 @@ C     w(1:i) = 0 and w(i+1) = 1; w(i+2:n) is stored on exit in
 C     B(i,i+2:n), if op(B) = 'N', and in B(i+2:n,i), otherwise.
 C     The scalar nu is stored in TAUR(i).
 C
-C     Each GV(i) is a Givens rotator acting on columns i+1 and n+i+1,
+C     Each GV(i) is a Givens rotation acting on columns i+1 and n+i+1,
 C     where the cosine is stored in CSR(2*i-1) and the sine in
 C     CSR(2*i).
 C
@@ -226,6 +214,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DGESUB).
+C     V. Sima, Aug. 2011, Oct. 2011.
 C
 C     KEYWORDS
 C
@@ -244,17 +233,18 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), B(LDB,*), CSL(*), CSR(*), DWORK(*),
      $                  G(LDG,*), Q(LDQ,*), TAUL(*), TAUR(*)
 C     .. Local Scalars ..
-      LOGICAL           LTRA, LTRB
-      INTEGER           I, IB, IERR, NB, NBMIN, NH, NIB, NNB, NX, PDW,
-     $                  PXA, PXB, PXG, PXQ, PYA, PYB, PYG, PYQ, WRKOPT
+      LOGICAL           LQUERY, LTRA, LTRB
+      INTEGER           I, IB, IERR, MINWRK, NB, NBMIN, NH, NIB, NNB,
+     $                  NX, PDW, PXA, PXB, PXG, PXQ, PYA, PYB, PYG, PYQ,
+     $                  WRKOPT
 C     .. External Functions ..
       LOGICAL           LSAME
       INTEGER           UE01MD
       EXTERNAL          LSAME, UE01MD
 C     .. External Subroutines ..
-      EXTERNAL          DGEMM, MB03XU, MB04TS, XERBLA
+      EXTERNAL          DGEQRF, DGEMM, MB03XU, MB04TS, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         DBLE, MAX, MIN
+      INTRINSIC         DBLE, INT, MAX, MIN
 C
 C     .. Executable Statements ..
 C
@@ -263,25 +253,45 @@ C
       INFO = 0
       LTRA = LSAME( TRANA, 'T' ) .OR. LSAME( TRANA, 'C' )
       LTRB = LSAME( TRANB, 'T' ) .OR. LSAME( TRANB, 'C' )
+C
+      MINWRK = MAX( 1, N )
+C
       IF ( .NOT.LTRA .AND. .NOT.LSAME( TRANA, 'N' ) ) THEN
          INFO = -1
       ELSE IF ( .NOT.LTRB .AND. .NOT.LSAME( TRANB, 'N' ) ) THEN
          INFO = -2
       ELSE IF ( N.LT.0 ) THEN
          INFO = -3
-      ELSE IF ( ILO.LT.1 .OR. ILO.GT.MAX( 1, N ) ) THEN
+      ELSE IF ( ILO.LT.1 .OR. ILO.GT.N+1 ) THEN
          INFO = -4
-      ELSE IF ( LDA.LT.MAX( 1, N ) ) THEN
+      ELSE IF ( LDA.LT.MINWRK ) THEN
          INFO = -6
-      ELSE IF ( LDB.LT.MAX( 1, N ) ) THEN
+      ELSE IF ( LDB.LT.MINWRK ) THEN
          INFO = -8
-      ELSE IF ( LDG.LT.MAX( 1, N ) ) THEN
+      ELSE IF ( LDG.LT.MINWRK ) THEN
          INFO = -10
-      ELSE IF ( LDQ.LT.MAX( 1, N ) ) THEN
+      ELSE IF ( LDQ.LT.MINWRK ) THEN
          INFO = -12
-      ELSE IF ( LDWORK.LT.MAX( 1, N ) ) THEN
-         DWORK(1) = DBLE( MAX( 1, N ) )
-         INFO = -18
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF ( LDWORK.LT.MINWRK .AND. .NOT.LQUERY ) THEN
+            DWORK(1) = DBLE( MINWRK )
+            INFO = -18
+         ELSE
+            IF ( N.EQ.0 ) THEN
+               WRKOPT = ONE
+            ELSE
+               CALL DGEQRF( N, ILO, DWORK, MINWRK, DWORK, DWORK, -1,
+     $                      INFO )
+               WRKOPT = MAX( MINWRK, INT( DWORK(1) ) ) 
+               NB     = INT( WRKOPT/ILO )
+               WRKOPT = MAX( WRKOPT, 16*N*NB + 5*NB )
+            END IF
+            IF ( LQUERY ) THEN
+               DWORK(1) = DBLE( WRKOPT )
+               RETURN
+            END IF
+         END IF
       END IF
 C
 C     Return if there were illegal values.
@@ -296,11 +306,11 @@ C     values.
 C
       DO 10  I = 1, ILO - 1
          CSL(2*I-1) = ONE
-         CSL(2*I) = ZERO
+         CSL(2*I)   = ZERO
          CSR(2*I-1) = ONE
-         CSR(2*I) = ZERO
-         TAUL(I) = ZERO
-         TAUR(I) = ZERO
+         CSR(2*I)   = ZERO
+         TAUL(I)    = ZERO
+         TAUR(I)    = ZERO
    10 CONTINUE
 C
 C     Quick return if possible.
@@ -313,9 +323,7 @@ C
 C
 C     Determine the block size.
 C
-      NB = UE01MD( 1, 'MB04TB', TRANA // TRANB, N, ILO, -1 )
       NBMIN = 2
-      WRKOPT = N
       IF ( NB.GT.1 .AND. NB.LT.NH ) THEN
 C
 C        Determine when to cross over from blocked to unblocked code.
@@ -326,7 +334,6 @@ C
 C
 C           Check whether workspace is large enough for blocked code.
 C
-            WRKOPT = 16*N*NB + 5*NB
             IF ( LDWORK.LT.WRKOPT ) THEN
 C
 C              Not enough workspace available. Determine minimum value
@@ -358,7 +365,7 @@ C
 C
       ELSE IF ( LTRA .AND. LTRB ) THEN
          DO 20  I = ILO, N-NX-1, NB
-            IB = MIN( NB, N-I )
+            IB  = MIN( NB, N-I )
             NIB = N*IB
 C
 C           Reduce rows and columns i:i+nb-1 to symplectic URV form and
@@ -435,7 +442,7 @@ C
 C
       ELSE IF ( LTRA ) THEN
          DO 30  I = ILO, N-NX-1, NB
-            IB = MIN( NB, N-I )
+            IB  = MIN( NB, N-I )
             NIB = N*IB
 C
 C           Reduce rows and columns i:i+nb-1 to symplectic URV form and
@@ -512,7 +519,7 @@ C
 C
       ELSE IF ( LTRB ) THEN
          DO 40  I = ILO, N-NX-1, NB
-            IB = MIN( NB, N-I )
+            IB  = MIN( NB, N-I )
             NIB = N*IB
 C
 C           Reduce rows and columns i:i+nb-1 to symplectic URV form and
@@ -589,7 +596,7 @@ C
 C
       ELSE
          DO 50  I = ILO, N-NX-1, NB
-            IB = MIN( NB, N-I )
+            IB  = MIN( NB, N-I )
             NIB = N*IB
 C
 C           Reduce rows and columns i:i+nb-1 to symplectic URV form and

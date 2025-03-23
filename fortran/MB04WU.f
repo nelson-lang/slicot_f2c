@@ -1,29 +1,11 @@
       SUBROUTINE MB04WU( TRANQ1, TRANQ2, M, N, K, Q1, LDQ1, Q2, LDQ2,
      $                   CS, TAU, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To generate a matrix Q with orthogonal columns (spanning an
 C     isotropic subspace), which is defined as the first n columns
-C     of a product of symplectic reflectors and Givens rotators,
+C     of a product of symplectic reflectors and Givens rotations,
 C
 C         Q = diag( H(1),H(1) ) G(1) diag( F(1),F(1) )
 C             diag( H(2),H(2) ) G(2) diag( F(2),F(2) )
@@ -62,7 +44,7 @@ C             The number of columns of the matrices Q1 and Q2.
 C             M >= N >= 0.
 C
 C     K       (input) INTEGER
-C             The number of symplectic Givens rotators whose product
+C             The number of symplectic Givens rotations whose product
 C             partly defines the matrix Q. N >= K >= 0.
 C
 C     Q1      (input/output) DOUBLE PRECISION array, dimension
@@ -108,7 +90,7 @@ C
 C     CS      (input) DOUBLE PRECISION array, dimension (2*K)
 C             On entry, the first 2*K elements of this array must
 C             contain the cosines and sines of the symplectic Givens
-C             rotators G(i).
+C             rotations G(i).
 C
 C     TAU     (input) DOUBLE PRECISION array, dimension (K)
 C             On entry, the first K elements of this array must

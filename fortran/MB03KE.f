@@ -1,24 +1,6 @@
       SUBROUTINE MB03KE( TRANA, TRANB, ISGN, K, M, N, PREC, SMIN, S, A,
      $                   B, C, SCALE, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve small periodic Sylvester-like equations (PSLE)
@@ -155,7 +137,7 @@ C     PEP_DGESY2, by R. Granat, Umea University, Sweden, Apr. 2008.
 C
 C     REVISIONS
 C
-C     V. Sima, Apr. 2010, Oct. 2010.
+C     V. Sima, Apr. 2010, Oct. 2010, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -179,10 +161,10 @@ C     .. Array Arguments ..
 C     ..
 C     .. Local Scalars ..
       LOGICAL            DOSCAL, LQUERY
-      INTEGER            CB, EYE, I, IA1, IA3, IB1, IB3, IC1, IDENOM,
-     $                   II, IM1, INUM, IXA, IXB, IXC, IZ, J, JJ, KM2,
-     $                   KM3, KMN, L, LDW, LEN, MINWRK, MM, MN, MN6,
-     $                   MN7, NN, ZC, ZD, ZI, ZI2, ZIS
+      INTEGER            CB, I, IA1, IA3, IB1, IB3, IC1, II, IM1, IXA,
+     $                   IXB, IXC, IZ, J, KM2, KM3, KMN, L, LDW, LEN,
+     $                   MINWRK, MM, MN, MN6, MN7, NN, ZC, ZD, ZI, ZI2,
+     $                   ZIS
       DOUBLE PRECISION   AC, AD, BETA, BIGNUM, DMIN, ELEM, SCALOC, SGN,
      $                   SPIV, TAU, TEMP
 C     ..

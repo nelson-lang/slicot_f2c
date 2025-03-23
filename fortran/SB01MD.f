@@ -1,24 +1,6 @@
       SUBROUTINE SB01MD( NCONT, N, A, LDA, B, WR, WI, Z, LDZ, G, DWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To determine the one-dimensional state feedback matrix G of the
@@ -158,7 +140,7 @@ C     .. Array Arguments ..
      $                  Z(LDZ,*)
 C     .. Local Scalars ..
       LOGICAL           COMPL
-      INTEGER           I, IM1, K, L, LL, LP1, NCONT2, NI, NJ, NL
+      INTEGER           I, IM1, K, L, LL, LP1, NCONT2, NI, NJ
       DOUBLE PRECISION  B1, P, Q, R, S, T
 C     .. External Functions ..
       DOUBLE PRECISION  DDOT
@@ -228,7 +210,6 @@ C
       COMPL = DWORK(NCONT2+L).NE.ZERO
       IF ( L.NE.NCONT ) THEN
          LP1 = L + 1
-         NL = NCONT - L
          IF ( LL.NE.2 ) THEN
             IF ( COMPL ) THEN
 C

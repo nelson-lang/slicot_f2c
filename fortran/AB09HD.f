@@ -3,24 +3,6 @@
      $                   TOL1, TOL2, IWORK, DWORK, LDWORK, BWORK, IWARN,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a reduced order model (Ar,Br,Cr,Dr) for an original
@@ -194,7 +176,7 @@ C             TOL2 < 1.
 C
 C     Workspace
 C
-C     IWORK   INTEGER array, dimension MAX(1,2*N)
+C     IWORK   INTEGER array, dimension (MAX(1,2*N))
 C             On exit with INFO = 0, IWORK(1) contains the order of the
 C             minimal realization of the system.
 C
@@ -420,7 +402,7 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       LOGICAL           BTA, DISCR, FIXORD, LEQUIL, SPA
       INTEGER           IERR, IWARNL, KB, KD, KT, KTI, KU, KW, KWI, KWR,
-     $                  LW, LWR, MB, N2, NMR, NN, NRA, NU, NU1, WRKOPT
+     $                  LW, LWR, MB, NMR, NN, NRA, NU, NU1, WRKOPT
       DOUBLE PRECISION  EPSM, MAXRED, RICOND, SCALEC, SCALEO
 C     .. External Functions ..
       LOGICAL           LSAME
@@ -574,7 +556,6 @@ C
 C
 C     Allocate working storage.
 C
-      N2  = N + N
       KB  = 1
       KD  = KB  + N*MB
       KT  = KD  + P*MB

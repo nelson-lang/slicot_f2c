@@ -2,24 +2,6 @@
      $                   Q, LDQ, R, LDR, L, LDL, IPIV, OUFACT, G, LDG,
      $                   IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the following matrices
@@ -42,7 +24,8 @@ C     algorithms for solving linear-quadratic optimization problems will
 C     then also solve optimization problems with coupling weighting
 C     matrix L. Moreover, a gain in efficiency is possible using matrix
 C     G in the deflating subspace algorithms (see SLICOT Library routine
-C     SB02OD).
+C     SB02OD) or in the Newton's algorithms (see SLICOT Library routine
+C     SG02CD).
 C
 C     ARGUMENTS
 C
@@ -64,12 +47,12 @@ C             Specifies how the matrix R is given (factored or not), as
 C             follows:
 C             = 'N':  Array R contains the matrix R;
 C             = 'C':  Array R contains the Cholesky factor of R;
-C             = 'U':  Array R contains the symmetric indefinite UdU' or
-C                     LdL' factorization of R.
+C             = 'U':  Array R contains the factors of the symmetric
+C                     indefinite UdU' or LdL' factorization of R.
 C
 C     UPLO    CHARACTER*1
-C             Specifies which triangle of the matrices R and Q (if
-C             JOBL = 'N') is stored, as follows:
+C             Specifies which triangle of the matrices R, Q (if
+C             JOBL = 'N'), and G (if JOBG = 'G') is stored, as follows:
 C             = 'U':  Upper triangle is stored;
 C             = 'L':  Lower triangle is stored.
 C
@@ -102,7 +85,7 @@ C             contain the matrix B.
 C             On exit, if OUFACT = 1, and INFO = 0, the leading N-by-M
 C                                                             -1
 C             part of this array contains the matrix B*chol(R)  .
-C             On exit, B is unchanged if OUFACT = 2 (hence also when
+C             On exit, B is unchanged if OUFACT <> 1 (hence also when
 C             FACT = 'U').
 C
 C     LDB     INTEGER
@@ -113,8 +96,8 @@ C             On entry, if JOBL = 'N', the leading N-by-N upper
 C             triangular part (if UPLO = 'U') or lower triangular part
 C             (if UPLO = 'L') of this array must contain the upper
 C             triangular part or lower triangular part, respectively, of
-C             the symmetric matrix Q. The stricly lower triangular part
-C             (if UPLO = 'U') or stricly upper triangular part (if
+C             the symmetric matrix Q. The strictly lower triangular part
+C             (if UPLO = 'U') or strictly upper triangular part (if
 C             UPLO = 'L') is not referenced.
 C             On exit, if JOBL = 'N' and INFO = 0, the leading N-by-N
 C             upper triangular part (if UPLO = 'U') or lower triangular
@@ -146,9 +129,10 @@ C             (if UPLO = 'L') of this array must contain the factors of
 C             the UdU' or LdL' factorization, respectively, of the
 C             symmetric indefinite input weighting matrix R (as produced
 C             by LAPACK routine DSYTRF).
-C             If FACT = 'N', the stricly lower triangular part (if UPLO
-C             = 'U') or stricly upper triangular part (if UPLO = 'L') of
-C             this array is used as workspace.
+C             If FACT = 'N', the strictly lower triangular part (if UPLO
+C             = 'U') or strictly upper triangular part (if UPLO = 'L')
+C             of this array is used as workspace (filled in by
+C             symmetry).
 C             On exit, if OUFACT = 1, and INFO = 0 (or INFO = M+1),
 C             the leading M-by-M upper triangular part (if UPLO = 'U')
 C             or lower triangular part (if UPLO = 'L') of this array
@@ -171,7 +155,7 @@ C             On exit, if JOBL = 'N', OUFACT = 1, and INFO = 0, the
 C             leading N-by-M part of this array contains the matrix
 C                      -1
 C             L*chol(R)  .
-C             On exit, L is unchanged if OUFACT = 2 (hence also when
+C             On exit, L is unchanged if OUFACT <> 1 (hence also when
 C             FACT = 'U').
 C             L is not referenced if JOBL = 'Z'.
 C
@@ -193,6 +177,7 @@ C             This array is not referenced if FACT = 'C'.
 C
 C     OUFACT  (output) INTEGER
 C             Information about the factorization finally used.
+C             OUFACT = 0:  no factorization of R has been used (M = 0);
 C             OUFACT = 1:  Cholesky factorization of R has been used;
 C             OUFACT = 2:  UdU' (if UPLO = 'U') or LdL' (if UPLO = 'L')
 C                          factorization of R has been used.
@@ -208,27 +193,44 @@ C             If JOBG = 'N', this array is not referenced.
 C
 C     LDG     INTEGER
 C             The leading dimension of array G.
-C             LDG >= MAX(1,N) if JOBG = 'G',
+C             LDG >= MAX(1,N) if JOBG = 'G';
 C             LDG >= 1        if JOBG = 'N'.
 C
 C     Workspace
 C
 C     IWORK   INTEGER array, dimension (M)
+C             If FACT = 'C' or FACT = 'U', this array is not referenced.
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
-C             On exit, if INFO = 0, DWORK(1) returns the optimal value
-C             of LDWORK; if FACT = 'N', DWORK(2) contains the reciprocal
+C             On exit, if INFO = 0 or LDWORK = -1, DWORK(1) returns the
+C             optimal value of LDWORK; if FACT = 'N' and LDWORK is set
+C             as specified below, DWORK(2) contains the reciprocal
 C             condition number of the given matrix R.
+C             On exit, if LDWORK = -2 on input or INFO = -23, then
+C             DWORK(1) returns the minimal value of LDWORK.
 C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.
-C             LDWORK >= 1              if FACT = 'C';
-C             LDWORK >= MAX(2,3*M,N*M) if FACT = 'N';
-C             LDWORK >= MAX(1,N*M)     if FACT = 'U'.
+C             LDWORK >= 1              if FACT = 'C' or  (FACT = 'U' and
+C                                         JOBG = 'N' and  JOBL = 'Z');
+C             LDWORK >= MAX(2,3*M)     if FACT = 'N' and  JOBG = 'N' and
+C                                                         JOBL = 'Z';
+C             LDWORK >= MAX(2,3*M,N*M) if FACT = 'N' and (JOBG = 'G' or
+C                                                         JOBL = 'N');
+C             LDWORK >= MAX(1,N*M)     if FACT = 'U' and (JOBG = 'G' or
+C                                                         JOBL = 'N').
 C             For optimum performance LDWORK should be larger than 3*M,
 C             if FACT = 'N'.
-C             The N*M workspace is not needed for FACT = 'N', if matrix
-C             R is positive definite.
+C
+C             If LDWORK = -1, an optimal workspace query is assumed; the
+C             routine only calculates the optimal size of the DWORK
+C             array, returns this value as the first entry of the DWORK
+C             array, and no error message is issued by XERBLA.
+C
+C             If LDWORK = -2, a minimal workspace query is assumed; the
+C             routine only calculates the minimal size of the DWORK
+C             array, returns this value as the first entry of the DWORK
+C             array, and no error message is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -257,7 +259,8 @@ C     Release 3.0: V. Sima, Katholieke Univ. Leuven, Belgium, Sep. 1997.
 C
 C     REVISIONS
 C
-C     -
+C     V. Sima, Research Institute for Informatics, Bucharest, Dec. 2013,
+C     Feb. 2014, Mar. 2014, May 2014.
 C
 C     KEYWORDS
 C
@@ -278,17 +281,18 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), B(LDB,*), DWORK(*), G(LDG,*),
      $                  L(LDL,*), Q(LDQ,*), R(LDR,*)
 C     .. Local Scalars ..
-      LOGICAL           LFACTA, LFACTC, LFACTU, LJOBG, LJOBL, LUPLOU
-      CHARACTER         TRANS
-      INTEGER           I, J, WRKOPT
+      LOGICAL           LFACTC, LFACTU, LJOBG, LJOBL, LNFACT, LUPLOU
+      CHARACTER         NT, TR, TRANS
+      INTEGER           J, WRKMIN, WRKOPT
       DOUBLE PRECISION  EPS, RCOND, RNORM
 C     .. External Functions ..
       LOGICAL           LSAME
       DOUBLE PRECISION  DLAMCH, DLANSY
       EXTERNAL          DLAMCH, DLANSY, LSAME
 C     .. External Subroutines ..
-      EXTERNAL          DCOPY, DGEMM, DGEMV, DPOCON, DPOTRF, DSYCON,
-     $                  DSYRK, DSYTRF, DSYTRS, DTRSM, XERBLA
+      EXTERNAL          DCOPY, DGEMM, DLASET, DPOCON, DPOTRF, DSYCON,
+     $                  DSYRK, DSYTRF, DSYTRS, DTRSM, MA02ED, MB01RB,
+     $                  XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC         INT, MAX
 C     .. Executable Statements ..
@@ -299,15 +303,15 @@ C
       LFACTC = LSAME( FACT, 'C' )
       LFACTU = LSAME( FACT, 'U' )
       LUPLOU = LSAME( UPLO, 'U' )
-      LFACTA = LFACTC.OR.LFACTU
+      LNFACT = .NOT.( LFACTC .OR. LFACTU )
 C
 C     Test the input scalar arguments.
 C
-      IF( .NOT.LJOBG .AND. .NOT.LSAME( JOBG, 'N' ) ) THEN
+      IF(      .NOT.LJOBG  .AND. .NOT.LSAME( JOBG, 'N' ) ) THEN
          INFO = -1
-      ELSE IF( .NOT.LJOBL .AND. .NOT.LSAME( JOBL, 'Z' ) ) THEN
+      ELSE IF( .NOT.LJOBL  .AND. .NOT.LSAME( JOBL, 'Z' ) ) THEN
          INFO = -2
-      ELSE IF( .NOT.LFACTA .AND. .NOT.LSAME( FACT, 'N' ) ) THEN
+      ELSE IF(     LNFACT  .AND. .NOT.LSAME( FACT, 'N' ) ) THEN
          INFO = -3
       ELSE IF( .NOT.LUPLOU .AND. .NOT.LSAME( UPLO, 'L' ) ) THEN
          INFO = -4
@@ -315,25 +319,53 @@ C
          INFO = -5
       ELSE IF( M.LT.0 ) THEN
          INFO = -6
-      ELSE IF( ( LDA.LT.1 ) .OR. ( LJOBL .AND. LDA.LT.N ) ) THEN
+      ELSE IF( LDA.LT.1 .OR. ( LJOBL .AND. LDA.LT.N ) ) THEN
          INFO = -8
       ELSE IF( LDB.LT.MAX( 1, N ) ) THEN
          INFO = -10
-      ELSE IF( ( LDQ.LT.1 ) .OR. ( LJOBL .AND. LDQ.LT.N ) ) THEN
+      ELSE IF( LDQ.LT.1 .OR. ( LJOBL .AND. LDQ.LT.N ) ) THEN
          INFO = -12
       ELSE IF( LDR.LT.MAX( 1, M ) ) THEN
          INFO = -14
-      ELSE IF( ( LDL.LT.1 ) .OR. ( LJOBL .AND. LDL.LT.N ) ) THEN
+      ELSE IF( LDL.LT.1 .OR. ( LJOBL .AND. LDL.LT.N ) ) THEN
          INFO = -16
-      ELSE IF( ( LDG.LT.1 ) .OR. ( LJOBG .AND. LDG.LT.N ) ) THEN
+      ELSE IF( LDG.LT.1 .OR. ( LJOBG .AND. LDG.LT.N ) ) THEN
          INFO = -20
-      ELSE IF( ( LFACTC .AND. LDWORK.LT.1 ) .OR.
-     $         ( LFACTU .AND. LDWORK.LT.MAX( 1, N*M ) ) .OR.
-     $    ( .NOT.LFACTA .AND. LDWORK.LT.MAX( 2, N*M, 3*M ) ) ) THEN
-         INFO = -23
+      ELSE
+         IF( LFACTC ) THEN
+            WRKMIN = 1
+         ELSE IF( LFACTU ) THEN
+            IF( LJOBG .OR. LJOBL ) THEN
+               WRKMIN = MAX( 1, N*M )
+            ELSE
+               WRKMIN = 1
+            END IF
+         ELSE
+            IF( LJOBG .OR. LJOBL ) THEN
+               WRKMIN = MAX( 2, 3*M, N*M )
+            ELSE
+               WRKMIN = MAX( 2, 3*M )
+            END IF
+         END IF
+         IF( LDWORK.EQ.-1 ) THEN
+            IF( LNFACT ) THEN
+               CALL DSYTRF( UPLO, M, R, LDR, IPIV, DWORK, -1, INFO )
+               WRKOPT = MAX( WRKMIN, INT( DWORK(1) ) )
+            ELSE
+               WRKOPT = WRKMIN
+            END IF
+            DWORK(1) = WRKOPT
+            RETURN
+         ELSE IF( LDWORK.EQ.-2 ) THEN
+            DWORK(1) = WRKMIN
+            RETURN
+         ELSE IF( LDWORK.LT.WRKMIN ) THEN
+            INFO = -23
+            DWORK(1) = WRKMIN
+         END IF
       END IF
 C
-      IF ( INFO.NE.0 ) THEN
+      IF( INFO.NE.0 ) THEN
 C
 C        Error return.
 C
@@ -341,18 +373,16 @@ C
          RETURN
       END IF
 C
-      IF ( LFACTC ) THEN
-         OUFACT = 1
-      ELSE IF ( LFACTU ) THEN
-         OUFACT = 2
-      END IF
-C
 C     Quick return if possible.
 C
-      IF ( N.EQ.0 .OR. M.EQ.0 .OR. .NOT.( LJOBL.OR.LJOBG ) ) THEN
-        DWORK(1) = ONE
-        IF ( .NOT.LFACTA ) DWORK(2) = ONE
-        RETURN
+      IF( M.EQ.0 ) THEN
+         IF( LJOBG )
+     $      CALL DLASET( UPLO, N, N, ZERO, ZERO, G, LDG )
+         OUFACT   = 0
+         DWORK(1) = WRKMIN
+         IF( LNFACT )
+     $      DWORK(2) = ZERO
+         RETURN
       END IF
 C
 C     (Note: Comments in the code beginning "Workspace:" describe the
@@ -363,11 +393,11 @@ C     following subroutine, as returned by ILAENV.)
 C
       WRKOPT = 1
 C
-C     Set relative machine precision.
+      IF( LNFACT ) THEN
 C
-      EPS = DLAMCH( 'Epsilon' )
+C        Set relative machine precision.
 C
-      IF ( .NOT.LFACTA ) THEN
+         EPS = DLAMCH( 'Precision' )
 C
 C        Compute the norm of the matrix R, which is not factored.
 C        Then save the given triangle of R in the other strict triangle
@@ -376,20 +406,8 @@ C        factorization.
 C        Workspace: need M.
 C
          RNORM = DLANSY( '1-norm', UPLO, M, R, LDR, DWORK )
-         CALL DCOPY( M, R, LDR+1, DWORK, 1 )
-         IF( LUPLOU ) THEN
-C
-            DO 20 J = 2, M
-               CALL DCOPY( J-1, R(1,J), 1, R(J,1), LDR )
-   20       CONTINUE
-C
-         ELSE
-C
-            DO 40 J = 2, M
-               CALL DCOPY( J-1, R(J,1), LDR, R(1,J), 1 )
-   40       CONTINUE
-C
-         END IF
+         CALL DCOPY(  M, R, LDR+1, DWORK, 1 )
+         CALL MA02ED( UPLO, M, R, LDR )
          CALL DPOTRF( UPLO, M, R, LDR, INFO )
          IF( INFO.EQ.0 ) THEN
 C
@@ -402,9 +420,9 @@ C
 C           Return if the matrix is singular to working precision.
 C
             OUFACT = 1
-            DWORK(2) = RCOND
             IF( RCOND.LT.EPS ) THEN
                INFO = M + 1
+               DWORK(2) = RCOND
                RETURN
             END IF
             WRKOPT = MAX( WRKOPT, 3*M )
@@ -415,17 +433,9 @@ C           triangle.
 C
             CALL DCOPY( M, DWORK, 1, R, LDR+1 )
             IF( LUPLOU ) THEN
-C
-               DO 60 J = 2, M
-                  CALL DCOPY( J-1, R(J,1), LDR, R(1,J), 1 )
-   60          CONTINUE
-C
+               CALL MA02ED( 'Lower', M, R, LDR )
             ELSE
-C
-               DO 80 J = 2, M
-                  CALL DCOPY( J-1, R(1,J), 1, R(J,1), LDR )
-   80          CONTINUE
-C
+               CALL MA02ED( 'Upper', M, R, LDR )
             END IF
 C
 C           Compute the UdU' or LdL' factorization.
@@ -435,7 +445,7 @@ C
             CALL DSYTRF( UPLO, M, R, LDR, IPIV, DWORK, LDWORK, INFO )
             OUFACT = 2
             IF( INFO.GT.0 ) THEN
-               DWORK(2) = ONE
+               DWORK(2) = ZERO
                RETURN
             END IF
             WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
@@ -448,133 +458,112 @@ C
 C
 C           Return if the matrix is singular to working precision.
 C
-            DWORK(2) = RCOND
             IF( RCOND.LT.EPS ) THEN
                INFO = M + 1
+               DWORK(2) = RCOND
                RETURN
             END IF
          END IF
+      ELSE IF( LFACTC ) THEN
+         OUFACT = 1
+      ELSE
+         OUFACT = 2
       END IF
 C
-      IF (OUFACT.EQ.1 ) THEN
+      IF( N.GT.0 .AND. ( LJOBG .OR. LJOBL ) ) THEN
+         NT = 'No transpose'
+         TR = 'Transpose'
 C
-C        Solve positive definite linear system(s).
+         IF( OUFACT.EQ.1 ) THEN
 C
-         IF ( LUPLOU ) THEN
-            TRANS = 'N'
-         ELSE
-            TRANS = 'T'
-         END IF
+C           Solve positive definite linear system(s).
 C
-C        Solve the system X*U = B, overwriting B with X.
-C
-         CALL DTRSM( 'Right', UPLO, TRANS, 'Non-unit', N, M,
-     $               ONE, R, LDR, B, LDB )
-C
-         IF ( LJOBG ) THEN
-C                                      -1
-C           Compute the matrix  G = B*R  *B', multiplying X*X' in G.
-C
-            CALL DSYRK( UPLO, 'No transpose', N, M, ONE, B, LDB, ZERO,
-     $                  G, LDG )
-         END IF
-C
-         IF( LJOBL ) THEN
-C
-C           Update matrices A and Q.
-C
-C           Solve the system Y*U = L, overwriting L with Y.
-C
-            CALL DTRSM( 'Right', UPLO, TRANS, 'Non-unit', N, M,
-     $                  ONE, R, LDR, L, LDL )
-C
-C           Compute A <- A - X*Y'.
-C
-            CALL DGEMM( 'No transpose', 'Transpose', N, N, M, -ONE, B,
-     $                  LDB, L, LDL, ONE, A, LDA )
-C
-C           Compute Q <- Q - Y*Y'.
-C
-            CALL DSYRK( UPLO, 'No transpose', N, M, -ONE, L, LDL, ONE,
-     $                  Q, LDQ )
-         END IF
-      ELSE
-C
-C        Solve indefinite linear system(s).
-C
-C        Solve the system UdU'*X = B' (or LdL'*X = B').
-C        Workspace: need N*M.
-C
-         DO 100 J = 1, M
-            CALL DCOPY( N, B(1,J), 1, DWORK(J), M )
-  100    CONTINUE
-C
-         CALL DSYTRS( UPLO, M, N, R, LDR, IPIV, DWORK, M, INFO )
-C
-         IF ( LJOBG ) THEN
-C                                                    -1
-C           Compute a triangle of the matrix  G = B*R  *B' = B*X.
-C
-            IF ( LUPLOU ) THEN
-               I = 1
-C
-               DO 120 J = 1, N
-                  CALL DGEMV( 'No transpose', J, M, ONE, B, LDB,
-     $                        DWORK(I), 1, ZERO, G(1,J), 1 )
-                  I = I + M
-  120          CONTINUE
-C
+            IF( LUPLOU ) THEN
+               TRANS = NT
             ELSE
-C
-               DO 140 J = 1, N
-                  CALL DGEMV( 'Transpose', M, J, ONE, DWORK, M, B(J,1),
-     $                        LDB, ZERO, G(J,1), LDG )
-  140          CONTINUE
-C
+               TRANS = TR
             END IF
-         END IF
 C
-         IF( LJOBL ) THEN
+C           Solve the system X*U = B, overwriting B with X.
 C
-C           Update matrices A and Q.
+            CALL DTRSM( 'Right', UPLO, TRANS, 'Non-unit', N, M, ONE, R,
+     $                  LDR, B, LDB )
 C
-C           Solve the system UdU'*Y = L' (or LdL'*Y = L').
+            IF( LJOBG ) THEN
+C                                         -1
+C              Compute the matrix  G = B*R  *B', multiplying X*X' in G.
 C
-            DO 160 J = 1, M
-               CALL DCOPY( N, L(1,J), 1, DWORK(J), M )
-  160       CONTINUE
+               CALL DSYRK( UPLO, NT, N, M, ONE, B, LDB, ZERO, G, LDG )
+            END IF
 C
-            CALL DSYTRS( UPLO, M, N, R, LDR, IPIV, DWORK, M, INFO )
+            IF( LJOBL ) THEN
 C
-C           A <- A - B*Y.
+C              Update matrices A and Q.
 C
-            CALL DGEMM( 'No transpose', 'No transpose', N, N, M, -ONE,
-     $                  B, LDB, DWORK, M, ONE, A, LDA )
-C                                            -          -1
-C           Compute a triangle of the matrix Q = Q - L*R  *L' = Q - L*Y.
+C              Solve the system Y*U = L, overwriting L with Y.
 C
-            IF ( LUPLOU ) THEN
-               I = 1
+               CALL DTRSM( 'Right', UPLO, TRANS, 'Non-unit', N, M, ONE,
+     $                     R, LDR, L, LDL )
 C
-               DO 180 J = 1, N
-                  CALL DGEMV( 'No transpose', J, M, -ONE, L, LDL,
-     $                        DWORK(I), 1, ONE, Q(1,J), 1 )
-                  I = I + M
-  180          CONTINUE
+C              Compute A <- A - X*Y'.
 C
-            ELSE
+               CALL DGEMM( NT, TR, N, N, M, -ONE, B, LDB, L, LDL, ONE,
+     $                     A, LDA )
 C
-               DO 200 J = 1, N
-                  CALL DGEMV( 'Transpose', M, J, -ONE, DWORK, M, L(J,1),
-     $                        LDL, ONE, Q(J,1), LDQ )
-  200          CONTINUE
+C              Compute Q <- Q - Y*Y'.
 C
+               CALL DSYRK( UPLO, NT, N, M, -ONE, L, LDL, ONE, Q, LDQ )
+            END IF
+         ELSE
+C
+C           Solve indefinite linear system(s).
+C
+            IF( LJOBG ) THEN
+C
+C              Solve the system UdU'*X = B' (or LdL'*X = B').
+C              Workspace: need N*M.
+C
+               DO 10 J = 1, M
+                  CALL DCOPY( N, B(1,J), 1, DWORK(J), M )
+   10          CONTINUE
+C
+               CALL DSYTRS( UPLO, M, N, R, LDR, IPIV, DWORK, M, INFO )
+C                                                       -1
+C              Compute a triangle of the matrix  G = B*R  *B' = B*X.
+C
+               CALL MB01RB( 'Left', UPLO, NT, N, M, ZERO, ONE, G, LDG,
+     $                      B, LDB, DWORK, M, INFO )
+            END IF
+C
+            IF( LJOBL ) THEN
+C
+C              Update matrices A and Q.
+C
+C              Solve the system UdU'*Y = L' (or LdL'*Y = L').
+C
+               DO 20 J = 1, M
+                  CALL DCOPY( N, L(1,J), 1, DWORK(J), M )
+   20          CONTINUE
+C
+               CALL DSYTRS( UPLO, M, N, R, LDR, IPIV, DWORK, M, INFO )
+C
+C              A <- A - B*Y.
+C
+               CALL DGEMM( NT, NT, N, N, M, -ONE, B, LDB, DWORK, M, ONE,
+     $                     A, LDA )
+C                                               -          -1
+C              Compute a triangle of the matrix Q = Q - L*R  *L'
+C                                                 = Q - L*Y.
+C
+               CALL MB01RB( 'Left', UPLO, NT, N, M, ONE, -ONE, Q, LDQ,
+     $                      L, LDL, DWORK, M, INFO )
             END IF
          END IF
       END IF
 C
       DWORK(1) = WRKOPT
-      IF ( .NOT.LFACTA ) DWORK(2) = RCOND
+      IF( LNFACT )
+     $   DWORK(2) = RCOND
 C
 C *** Last line of SB02MT ***
       RETURN

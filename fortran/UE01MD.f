@@ -1,23 +1,5 @@
       INTEGER FUNCTION UE01MD( ISPEC, NAME, OPTS, N1, N2, N3 )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To provide an extension of the LAPACK routine ILAENV to
@@ -75,6 +57,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine ILAHAP).
+C     V. Sima, Aug. 2011, Nov. 2011.
 C
 C     ******************************************************************
 C
@@ -83,8 +66,7 @@ C     .. Scalar Arguments ..
       INTEGER            ISPEC, N1, N2, N3
 C
 C     .. Local Scalars ..
-      LOGICAL            CNAME, SNAME
-      CHARACTER*1        C1, C3
+      CHARACTER*1        C3
       CHARACTER*2        C2
       CHARACTER*6        SUBNAM
       INTEGER            I, IC, IZ, NB, NBMIN, NX
@@ -149,11 +131,6 @@ C
             END IF
          END IF
 C
-         C1 = SUBNAM( 1:1 )
-         SNAME = C1.EQ.'S' .OR. C1.EQ.'D'
-         CNAME = C1.EQ.'C' .OR. C1.EQ.'Z'
-         IF ( .NOT.( CNAME .OR. SNAME ) )
-     $      RETURN
          C2 = SUBNAM( 4:5 )
          C3 = SUBNAM( 6:6 )
 C
@@ -178,10 +155,10 @@ C
                ELSE IF ( C3.EQ.'B' ) THEN
                   NB = ILAENV( 1, 'DORMQR', ' ', N1, N2, N3, -1 ) / 2
                END IF
-**          ELSE IF ( C2.EQ.'SH' ) THEN
-**             IF ( C3.EQ.'PVB' ) THEN
-**                NB = ILAENV( 1, 'DGEHRD', ' ', N1, N2, N1, -1 ) / 2
-**             END IF
+            ELSE IF ( C2.EQ.'4R' ) THEN
+               IF ( C3.EQ.'B' ) THEN
+                  NB = ILAENV( 1, 'DGEHRD', ' ', N1, N2, N1, -1 ) / 2
+               END IF
             END IF
             UE01MD = NB
          ELSE IF ( ISPEC.EQ.2 ) THEN
@@ -210,11 +187,11 @@ C
                   NBMIN = MAX( 2, ILAENV( 2, 'DORMQR', ' ', N1, N2, N3,
      $                                    -1 ) / 2 )
                END IF
-**          ELSE IF ( C2.EQ.'SH' ) THEN
-**             IF ( C3.EQ.'PVB' ) THEN
-**                NBMIN = MAX( 2, ILAENV( 2, 'DGEHRD', ' ', N1, N2, N1,
-**   $                                    -1 ) / 4 )
-**             END IF
+            ELSE IF ( C2.EQ.'4R' ) THEN
+               IF ( C3.EQ.'B' ) THEN
+                  NBMIN = MAX( 2, ILAENV( 2, 'DGEHRD', ' ', N1, N2, N1,
+     $                                    -1 ) / 4 )
+               END IF
             END IF
             UE01MD = NBMIN
          ELSE IF ( ISPEC.EQ.3 ) THEN
@@ -238,10 +215,10 @@ C
                ELSE IF ( C3.EQ.'B' ) THEN
                   NX = ILAENV( 3, 'DORGQR', ' ', N1, N2, N3, -1 )
                END IF
-**          ELSE IF ( C2.EQ.'SH' ) THEN
-**             IF ( C3.EQ.'PVB' ) THEN
-**                NX = ILAENV( 3, 'DGEHRD', ' ', N1, N2, N1, -1 ) / 2
-**             END IF
+            ELSE IF ( C2.EQ.'4R' ) THEN
+               IF ( C3.EQ.'B' ) THEN
+                  NX = ILAENV( 3, 'DGEHRD', ' ', N1, N2, N1, -1 ) / 2
+               END IF
             END IF
             UE01MD = NX
          END IF

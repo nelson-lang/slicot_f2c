@@ -1,24 +1,6 @@
       SUBROUTINE SB03OU( DISCR, LTRANS, N, M, A, LDA, B, LDB, TAU, U,
      $                   LDU, SCALE, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve for X = op(U)'*op(U) either the stable non-negative
@@ -142,6 +124,12 @@ C     LDWORK  INTEGER
 C             The length of the array DWORK. LDWORK >= MAX(1,4*N).
 C             For optimum performance LDWORK should sometimes be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed; the
+C             routine only calculates the optimal size of the DWORK
+C             array, returns this value as the first entry of the DWORK
+C             array, and no error message related to LDWORK is issued by
+C             XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -251,7 +239,7 @@ C     May 1992.
 C
 C     REVISIONS
 C
-C     Dec. 1997, April 1998, May 1999.
+C     Dec. 1997, April 1998, May 1999, July 2011.
 C
 C     KEYWORDS
 C
@@ -269,12 +257,13 @@ C     .. Scalar Arguments ..
 C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), B(LDB,*), DWORK(*), TAU(*), U(LDU,*)
 C     .. Local Scalars ..
-      INTEGER           I, J, K, L, MN, WRKOPT
+      LOGICAL           LQUERY
+      INTEGER           I, J, K, L, MINWRK, MN, WRKOPT
 C     .. External Subroutines ..
       EXTERNAL          DCOPY, DGEQRF, DGERQF, DLACPY, DLASET, SB03OT,
      $                  XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC         MAX, MIN
+      INTRINSIC         INT, MAX, MIN
 C     .. Executable Statements ..
 C
       INFO = 0
@@ -292,8 +281,19 @@ C
          INFO = -8
       ELSE IF( LDU.LT.MAX( 1, N ) ) THEN
          INFO = -11
-      ELSE IF( LDWORK.LT.MAX( 1, 4*N ) ) THEN
-         INFO = -14
+      ELSE
+         MINWRK = MAX( 1, 4*N )
+         LQUERY = LDWORK.EQ.-1
+         IF( LQUERY ) THEN
+            IF ( LTRANS ) THEN
+               CALL DGERQF( N, M, B, LDB, TAU, DWORK, -1, INFO )
+            ELSE
+               CALL DGEQRF( M, N, B, LDB, TAU, DWORK, -1, INFO )
+            END IF
+            WRKOPT = MAX( MINWRK, INT( DWORK(1) ) )
+         ELSE IF( LDWORK.LT.MINWRK ) THEN
+            INFO = -14
+         END IF
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -301,6 +301,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'SB03OU', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C

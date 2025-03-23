@@ -2,24 +2,6 @@
      $                   Q, LDQ, Z, LDZ, ISTAIR, NBLCKS, NBLCKI, IMUK,
      $                   INUK, IMUK0, MNEI, TOL, IWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute orthogonal transformations Q and Z such that the
@@ -299,7 +281,8 @@ C     3) INUK0 is removed.
 C
 C     REVISIONS
 C
-C     -
+C     V. Sima, Aug. 2011.
+C     A. Varga, May 2017
 C
 C     KEYWORDS
 C
@@ -323,8 +306,7 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       LOGICAL           FIRST, FIRSTI, LJOBQI, LJOBZI, LMODEB, LMODES,
      $                  LMODET, UPDATQ, UPDATZ
-      INTEGER           I, IFICA, IFIRA, ISMUK, ISNUK, JK, K, NCA, NRA,
-     $                  RANKA
+      INTEGER           I, IFICA, IFIRA, ISMUK, ISNUK, JK, K, NCA, RANKA
       DOUBLE PRECISION  TOLER
 C     .. Local Arrays ..
       DOUBLE PRECISION  DWORK(1)
@@ -401,11 +383,9 @@ C
       END IF
 C
       IF ( M.EQ.0 ) THEN
-         NBLCKS = N
-         DO 10 I = 1, N
-            IMUK(I) = 1
-            INUK(I) = 0
-   10    CONTINUE
+         NBLCKS  = 1
+         IMUK(1) = N
+         INUK(1) = 0
          MNEI(1) = 0
          MNEI(2) = N
          MNEI(3) = 0
@@ -422,11 +402,10 @@ C     A(k) is the submatrix in A that will be row compressed.
 C
 C     ISMUK = sum(i=1,..,k) MU(i), ISNUK = sum(i=1,...,k) NU(i),
 C     IFIRA, IFICA: first row and first column index of A(k) in A.
-C     NRA, NCA: number of rows and columns in A(k).
+C     NCA: number of columns in A(k).
 C
       IFIRA = 1
       IFICA = 1
-      NRA = M
       NCA = N - RANKE
       ISNUK = 0
       ISMUK = 0
@@ -472,7 +451,6 @@ C
          ELSE
             JK = ABS( ISTAIR(IFIRA) )
          END IF
-         NRA = M - ISNUK
          NCA = JK - 1 - ISMUK
 C
 C        If NCA > 0 then there can be done some more row compression

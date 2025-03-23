@@ -3,24 +3,6 @@
      $                   NINFE, NKROL, INFZ, KRONR, INFE, KRONL,
      $                   TOL, IWORK, DWORK, ZWORK, LZWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To extract from the system pencil
@@ -158,7 +140,7 @@ C             (see LAPACK Library routine DLAMCH).  TOL < 1.
 C
 C     Workspace
 C
-C     IWORK   INTEGER array, dimension N+max(1,M)
+C     IWORK   INTEGER array, dimension (N+max(1,M))
 C             On output, IWORK(1) contains the normal rank of the
 C             transfer function matrix.
 C
@@ -254,7 +236,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2009,
-C     Apr. 2009.
+C     Apr. 2009, Apr. 2011, Feb. 2017.
 C
 C     KEYWORDS
 C
@@ -281,16 +263,15 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       LOGICAL           LEQUIL, LQUERY
       INTEGER           I, I0, I1, II, IPD, ITAU, J, JWORK, KABCD,
-     $                  LABCD2, LDABCD, LZW, MM, MU, N2, NB, NN, NSINFE,
-     $                  NU, NUMU, PP, WRKOPT
+     $                  LABCD2, LDABCD, LZW, MM, MU, N2, NN, NSINFE, NU,
+     $                  NUMU, PP, WRKOPT
       DOUBLE PRECISION  SVLMAX, TOLER
 C     .. Local Arrays ..
       COMPLEX*16        DUM(1)
 C     .. External Functions ..
       LOGICAL           LSAME
-      INTEGER           ILAENV
       DOUBLE PRECISION  DLAMCH, ZLANGE
-      EXTERNAL          DLAMCH, ILAENV, LSAME, ZLANGE
+      EXTERNAL          DLAMCH, LSAME, ZLANGE
 C     .. External Subroutines ..
       EXTERNAL          AG8BYZ, MA02BZ, MA02CZ, TB01XZ, TG01AZ, TG01FZ,
      $                  XERBLA, ZLACPY, ZLASET, ZTZRZF, ZUNMRZ
@@ -335,24 +316,27 @@ C
          LZW = MAX( 1, LABCD2 + MAX( I0 + MAX( I1, 3*( M+N ) - 1 ),
      $                               3*( L+P ) ) )
          IF( LQUERY ) THEN
+            I = MAX( 1, LDABCD+I1 )
+            J = MAX( 1, LDABCD )
             CALL TG01FZ( 'N', 'N', 'N', L, N, M, P, A, LDA, E, LDE, B,
      $                   LDB, C, LDC, DUM, 1, DUM, 1, NN, N2, TOL,
      $                   IWORK, DWORK, ZWORK, -1, INFO )
             WRKOPT = MAX( LZW, INT( ZWORK(1) ) )
             SVLMAX = ZERO
-            CALL AG8BYZ( .TRUE., I1, M+N, P+L, SVLMAX, ZWORK, LDABCD+I1,
-     $                   E, LDE, NU, MU, NIZ, DINFZ, NKROL, INFZ, KRONL,
-     $                   TOL, IWORK, DWORK, ZWORK, -1, INFO )
+            CALL AG8BYZ( .TRUE., I1, M+N, P+L, SVLMAX, ZWORK, I, E, LDE,
+     $                   NU, MU, NIZ, DINFZ, NKROL, INFZ, KRONL, TOL,
+     $                   IWORK, DWORK, ZWORK, -1, INFO )
             WRKOPT = MAX( WRKOPT, LABCD2 + INT( ZWORK(1) ) )
-            CALL AG8BYZ( .FALSE., I1, II, M+N, SVLMAX, ZWORK, LDABCD+I1,
-     $                   E, LDE, NU, MU, NIZ, DINFZ, NKROL, INFZ, KRONL,
-     $                   TOL, IWORK, DWORK, ZWORK, -1, INFO )
+            CALL AG8BYZ( .FALSE., I1, II, M+N, SVLMAX, ZWORK, I, E, LDE,
+     $                   NU, MU, NIZ, DINFZ, NKROL, INFZ, KRONL, TOL,
+     $                   IWORK, DWORK, ZWORK, -1, INFO )
             WRKOPT = MAX( WRKOPT, LABCD2 + INT( ZWORK(1) ) )
-            NB = ILAENV( 1, 'ZGERQF', ' ', II, I1+II, -1, -1 )
-            WRKOPT = MAX( WRKOPT, LABCD2 + II + II*NB )
-            NB = MIN( 64, ILAENV( 1, 'ZUNMRQ', 'RC', I1, I1+II, II,
-     $                            -1 ) )
-            WRKOPT = MAX( WRKOPT, LABCD2 + II + I1*NB )
+            CALL ZTZRZF( II, I1+II, ZWORK, J, ZWORK, ZWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, LABCD2 + II + INT( ZWORK(1) ) )
+            CALL ZUNMRZ( 'Right', 'Conjugate transpose', I1, I1+II, II,
+     $                   I1, ZWORK, J, ZWORK, ZWORK, J, ZWORK, -1,
+     $                   INFO )
+            WRKOPT = MAX( WRKOPT, LABCD2 + II + INT( ZWORK(1) ) )
          ELSE IF( LZWORK.LT.LZW ) THEN
             INFO = -31
          END IF
@@ -401,7 +385,6 @@ C
          CALL TG01AZ( 'A', L, N, M, P, ZERO, A, LDA, E, LDE, B, LDB,
      $                C, LDC, DWORK, DWORK(L+1), DWORK(L+N+1), INFO )
       END IF
-      SVLMAX = ZLANGE( 'Frobenius', L, N, E, LDE, DWORK )
 C
 C     Reduce the system matrix to QR form,
 C
@@ -450,9 +433,8 @@ C
       IF( TOLER.LE.ZERO ) THEN
          TOLER = DBLE( ( L + P )*( M + N ) ) * DLAMCH( 'Precision' )
       END IF
-      SVLMAX = MAX( SVLMAX,
-     $              ZLANGE( 'Frobenius', NN+PP, NN+MM, ZWORK(KABCD),
-     $                      LDABCD, DWORK ) )
+      SVLMAX = ZLANGE( 'Frobenius', NN+PP, NN+MM, ZWORK(KABCD), LDABCD,
+     $                 DWORK )
 C
 C     Extract the reduced pencil S2(lambda)
 C

@@ -1,29 +1,11 @@
       SUBROUTINE MB04QF( DIRECT, STOREV, STOREW, N, K, V, LDV, W, LDW,
      $                   CS, TAU, RS, LDRS, T, LDT, DWORK )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To form the triangular block factors R, S and T of a symplectic
 C     block reflector SH, which is defined as a product of 2k
-C     concatenated Householder reflectors and k Givens rotators,
+C     concatenated Householder reflectors and k Givens rotations,
 C
 C         SH = diag( H(1),H(1) ) G(1) diag( F(1),F(1) )
 C              diag( H(2),H(2) ) G(2) diag( F(2),F(2) )
@@ -66,7 +48,7 @@ C             The order of the Householder reflectors F(i) and H(i).
 C             N >= 0.
 C
 C     K       (input) INTEGER
-C             The number of Givens rotators.  K >= 1.
+C             The number of Givens rotations.  K >= 1.
 C
 C     V       (input) DOUBLE PRECISION array, dimension
 C                     (LDV,K) if STOREV = 'C',
@@ -101,7 +83,7 @@ C
 C     CS      (input) DOUBLE PRECISION array, dimension (2*K)
 C             On entry, the first 2*K elements of this array must
 C             contain the cosines and sines of the symplectic Givens
-C             rotators G(i).
+C             rotations G(i).
 C
 C     TAU     (input) DOUBLE PRECISION array, dimension (K)
 C             On entry, the first K elements of this array must

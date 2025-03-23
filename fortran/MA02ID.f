@@ -1,24 +1,6 @@
       DOUBLE PRECISION FUNCTION MA02ID( TYP, NORM, N, A, LDA, QG,
      $                                  LDQG, DWORK )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the value of the one norm, or the Frobenius norm, or
@@ -86,7 +68,6 @@ C             The leading dimension of the array QG.  LDQG >= MAX(1,N).
 C
 C     Workspace
 C
-C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             where LDWORK >= 2*N when NORM = '1', NORM = 'I' or
 C             NORM = 'O'; otherwise, DWORK is not referenced.
@@ -99,6 +80,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DLANHA).
+C     V. Sima, Jan. 2016 (removed O(N) tests in several loops).
 C
 C     KEYWORDS
 C
@@ -181,25 +163,28 @@ C
 C
 C        Compute the maximal absolute column sum.
 C
-         DO 90 J = 1, N+1
+         DO 90 J = 1, N
             DO 70  I = 1, J-2
                TEMP = ABS( QG(I,J) )
                DWORK(I) = DWORK(I) + TEMP
                DWORK(J-1) = DWORK(J-1) + TEMP
    70       CONTINUE
-            IF ( J.LT.N+1 ) THEN
-               SUM = DWORK(N+J)
-               DO 80  I = J+1, N
-                  TEMP = ABS( QG(I,J) )
-                  SUM  = SUM + TEMP
-                  DWORK(N+I) = DWORK(N+I) + TEMP
-   80          CONTINUE
-               VALUE = MAX( VALUE, SUM )
-            END IF
+            SUM = DWORK(N+J)
+            DO 80  I = J+1, N
+               TEMP = ABS( QG(I,J) )
+               SUM  = SUM + TEMP
+               DWORK(N+I) = DWORK(N+I) + TEMP
+   80       CONTINUE
+            VALUE = MAX( VALUE, SUM )
    90    CONTINUE
-         DO 100 I = 1, N
-            VALUE = MAX( VALUE, DWORK(I) )
+         DO 100  I = 1, N-1
+            TEMP = ABS( QG(I,N+1) )
+            DWORK(I) = DWORK(I) + TEMP
+            DWORK(N) = DWORK(N) + TEMP
   100    CONTINUE
+         DO 110 I = 1, N
+            VALUE = MAX( VALUE, DWORK(I) )
+  110    CONTINUE
 C
       ELSE IF ( LSAME( NORM, 'O' ) .OR. ( NORM.EQ.'1' ) .OR.
      $          LSAME( NORM, 'I' ) ) THEN
@@ -207,43 +192,53 @@ C
 C        Find the column and row sums of A (in one pass).
 C
          VALUE = ZERO
-         DO 110 I = 1, N
+         DO 120 I = 1, N
             DWORK(I) = ZERO
-  110   CONTINUE
+  120   CONTINUE
 C
-         DO 130 J = 1, N
+         DO 140 J = 1, N
             SUM = ZERO
-            DO 120 I = 1, N
+            DO 130 I = 1, N
                TEMP = ABS( A(I,J) )
                SUM  = SUM + TEMP
                DWORK(I) = DWORK(I) + TEMP
-  120       CONTINUE
+  130       CONTINUE
             DWORK(N+J) = SUM
-  130    CONTINUE
+  140    CONTINUE
 C
 C        Compute the maximal absolute column sum.
 C
-         DO 160 J = 1, N+1
-            DO 140  I = 1, J-2
+         SUM = DWORK(N+1) + ABS( QG(1,1) )
+         DO 150 I = 2, N
+            TEMP = ABS( QG(I,1) )
+            SUM  = SUM + TEMP
+            DWORK(N+I) = DWORK(N+I) + TEMP
+  150    CONTINUE
+         VALUE = MAX( VALUE, SUM )
+         DO 180 J = 2, N
+            DO 160  I = 1, J-2
                TEMP = ABS( QG(I,J) )
                DWORK(I) = DWORK(I) + TEMP
                DWORK(J-1) = DWORK(J-1) + TEMP
-  140       CONTINUE
-            IF ( J.GT.1 )
-     $         DWORK(J-1) = DWORK(J-1) + ABS( QG(J-1,J) )
-            IF ( J.LT.N+1 ) THEN
-               SUM = DWORK(N+J) + ABS( QG(J,J) )
-               DO 150 I = J+1, N
-                  TEMP = ABS( QG(I,J) )
-                  SUM  = SUM + TEMP
-                  DWORK(N+I) = DWORK(N+I) + TEMP
-  150          CONTINUE
-               VALUE = MAX( VALUE, SUM )
-            END IF
-  160    CONTINUE
-         DO 170 I = 1, N
+  160       CONTINUE
+            DWORK(J-1) = DWORK(J-1) + ABS( QG(J-1,J) )
+            SUM = DWORK(N+J) + ABS( QG(J,J) )
+            DO 170 I = J+1, N
+               TEMP = ABS( QG(I,J) )
+               SUM  = SUM + TEMP
+               DWORK(N+I) = DWORK(N+I) + TEMP
+  170       CONTINUE
+            VALUE = MAX( VALUE, SUM )
+  180    CONTINUE
+         DO 190  I = 1, J-2
+            TEMP = ABS( QG(I,N+1) )
+            DWORK(I) = DWORK(I) + TEMP
+            DWORK(N) = DWORK(N) + TEMP
+  190    CONTINUE
+         DWORK(N) = DWORK(N) + ABS( QG(N,N+1) )
+         DO 200 I = 1, N
             VALUE = MAX( VALUE, DWORK(I) )
-  170    CONTINUE
+  200    CONTINUE
 C
       ELSE IF ( ( LSAME( NORM, 'F' ) .OR.
      $            LSAME( NORM, 'E' ) ) .AND. LSH ) THEN
@@ -252,37 +247,44 @@ C        Find normF(A).
 C
          SCALE = ZERO
          SUM = ONE
-         DO 180 J = 1, N
+         DO 210 J = 1, N
             CALL DLASSQ( N, A(1,J), 1, SCALE, SUM )
-  180    CONTINUE
+  210    CONTINUE
 C
 C        Add normF(G) and normF(Q).
 C
-         DO 190 J = 1, N+1
-            IF ( J.GT.2 )
-     $         CALL DLASSQ( J-2, QG(1,J), 1, SCALE, SUM )
-            IF ( J.LT.N )
-     $         CALL DLASSQ( N-J, QG(J+1,J), 1, SCALE, SUM )
-  190    CONTINUE
+         IF ( N.GT.1 )
+     $      CALL DLASSQ( N-1, QG(2,1), 1, SCALE, SUM )
+         IF ( N.GT.2 )
+     $      CALL DLASSQ( N-2, QG(3,2), 1, SCALE, SUM )
+         DO 220 J = 3, N-1
+            CALL DLASSQ( J-2, QG(1,J),   1, SCALE, SUM )
+            CALL DLASSQ( N-J, QG(J+1,J), 1, SCALE, SUM )
+  220    CONTINUE
+         CALL DLASSQ( N-2, QG(1,N),   1, SCALE, SUM )
+         CALL DLASSQ( N-1, QG(1,N+1), 1, SCALE, SUM )
          VALUE = SQRT( TWO )*SCALE*SQRT( SUM )
+C
       ELSE IF ( LSAME( NORM, 'F' ) .OR. LSAME( NORM, 'E' ) ) THEN
+C
          SCALE = ZERO
          SUM = ONE
-         DO 200 J = 1, N
+         DO 230 J = 1, N
             CALL DLASSQ( N, A(1,J), 1, SCALE, SUM )
-  200    CONTINUE
+  230    CONTINUE
+C
          DSCL = ZERO
          DSUM = ONE
-         DO 210 J = 1, N+1
-            IF ( J.GT.1 ) THEN
-               CALL DLASSQ( J-2, QG(1,J), 1, SCALE, SUM )
-               CALL DLASSQ( 1, QG(J-1,J), 1, DSCL, DSUM )
-            END IF
-            IF ( J.LT.N+1 ) THEN
-               CALL DLASSQ( 1, QG(J,J), 1, DSCL, DSUM )
-               CALL DLASSQ( N-J, QG(J+1,J), 1, SCALE, SUM )
-            END IF
-  210    CONTINUE
+         CALL DLASSQ( 1, QG(1,1), 1, DSCL, DSUM )
+         IF ( N.GT.1 )
+     $      CALL DLASSQ( N-1, QG(2,1), 1, SCALE, SUM )
+         DO 240 J = 2, N
+            CALL DLASSQ( J-2, QG(1,J),   1, SCALE, SUM )
+            CALL DLASSQ( 2,   QG(J-1,J), 1, DSCL, DSUM )
+            CALL DLASSQ( N-J, QG(J+1,J), 1, SCALE, SUM )
+  240    CONTINUE
+         CALL DLASSQ( N-1, QG(1,N+1), 1, SCALE, SUM )
+         CALL DLASSQ( 1,   QG(N,N+1), 1, DSCL, DSUM )
          VALUE = DLAPY2( SQRT( TWO )*SCALE*SQRT( SUM ),
      $                   DSCL*SQRT( DSUM ) )
       END IF

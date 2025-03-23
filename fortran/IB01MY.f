@@ -2,24 +2,6 @@
      $                   Y, LDY, R, LDR, IWORK, DWORK, LDWORK, IWARN,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To construct an upper triangular factor  R  of the concatenated
@@ -129,7 +111,19 @@ C             LDR >= 2*(M+L)*NOBR.
 C
 C     Workspace
 C
-C     IWORK   INTEGER array, dimension (M+L)
+C     IWORK   INTEGER array, dimension MAX(3,M+L)
+C             On entry with  BATCH = 'I'  or  BATCH = 'L',  IWORK(1:3)
+C             must contain the values of ICYCLE, MAXWRK, and NSMPSM
+C             set by the previous call of this routine.
+C             On exit with  BATCH = 'F'  or  BATCH = 'I',  IWORK(1:3)
+C             contains the values of ICYCLE, MAXWRK, and NSMPSM to be
+C             used by the next call of the routine.
+C             ICYCLE  counts the cycles for  BATCH = 'I'.
+C             MAXWRK  stores the current optimal workspace.
+C             NSMPSM  sums up the  NSMP  values for  BATCH <> 'O'.
+C             The first three elements of  IWORK  should be preserved
+C             during successive calls of the routine with  BATCH = 'F'
+C             or  BATCH = 'I',  till the final call with   BATCH = 'L'.
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if  INFO = 0,  DWORK(1)  returns the optimal
@@ -154,6 +148,14 @@ C                              if BATCH = 'F' or 'I' and CONCT = 'N';
 C             LDWORK >= (M+L)*4*NOBR*(M+L+1)+(M+L)*2*NOBR,
 C                              if BATCH = 'L' and CONCT = 'N',
 C                              or BATCH = 'O'.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA. The workspace query should be done
+C             for BATCH = 'L' or BATCH = 'O'. To get it in advance, use
+C             BATCH = 'O'.
 C
 C     Warning Indicator
 C
@@ -236,7 +238,8 @@ C     Katholieke Universiteit Leuven, February 2000.
 C
 C     REVISIONS
 C
-C     V. Sima, July 2000, August 2000, Feb. 2004, May 2009.
+C     V. Sima, July 2000, August 2000, Feb. 2004, May 2009, May 2011,
+C     May 2020.
 C
 C     KEYWORDS
 C
@@ -264,8 +267,8 @@ C     .. Local Scalars ..
      $                   JDS, JWORK, K, LDRWRK, LLNOBR, LNOBR, LNRG,
      $                   MAXWRK, MINWRK, MMNOBR, MNOBR, MNRG, NOBR2,
      $                   NOBR21, NR, NRG, NS, NSM, NSMPSM
-      LOGICAL            CONNEC, FIRST, INTERM, LAST, MOESP, N4SID,
-     $                   ONEBCH
+      LOGICAL            CONNEC, FIRST, INTERM, LAST, LQUERY, MOESP,
+     $                   N4SID, ONEBCH
 C     .. Local Arrays ..
       DOUBLE PRECISION   DUM(1)
 C     .. External Functions ..
@@ -278,11 +281,6 @@ C     .. External Subroutines ..
      $                   MA02FD, MB04ID, MB04OD, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC          ABS, INT, MAX, SQRT
-C     .. Save Statement ..
-C        ICYCLE  is used to count the cycles for  BATCH = 'I'.
-C        MAXWRK  is used to store the optimal workspace.
-C        NSMPSM  is used to sum up the  NSMP  values for  BATCH <> 'O'.
-      SAVE               ICYCLE, MAXWRK, NSMPSM
 C     ..
 C     .. Executable Statements ..
 C
@@ -311,6 +309,10 @@ C
          ICYCLE = 1
          MAXWRK = 1
          NSMPSM = 0
+      ELSE IF( .NOT.ONEBCH ) THEN
+         ICYCLE = IWORK(1)
+         MAXWRK = IWORK(2)
+         NSMPSM = IWORK(3)
       END IF
       NSMPSM = NSMPSM + NSMP
       NR     = MMNOBR + LLNOBR
@@ -355,9 +357,35 @@ C
                MINWRK = 2*NR*NRG + NR
             END IF
             MAXWRK = MAX( MINWRK, MAXWRK )
+            LQUERY = LDWORK.EQ.-1
 C
-            IF( LDWORK.LT.MINWRK )
-     $         INFO = -16
+            IF ( LQUERY ) THEN
+               I = NRG*2*NR
+               IF ( M.GT.0 ) THEN
+                  I = I + M
+                  CALL DGEQRF( NRG, M, DWORK, NRG, DWORK, DWORK, -1,
+     $                         IERR )
+                  MAXWRK = MAX( MAXWRK, I + INT( DWORK(1) ) )
+                  CALL DORMQR( 'Left', 'Transpose', NRG, NR-M, M, DWORK,
+     $                         NRG, DWORK, DWORK, NRG, DWORK, -1, IERR )
+                  MAXWRK = MAX( MAXWRK, I + INT( DWORK(1) ) )
+                  I = I - M
+               END IF
+               I = I + L
+               CALL DGEQRF( NRG, L, DWORK, NRG, DWORK, DWORK, -1, IERR )
+               MAXWRK = MAX( MAXWRK, I + INT( DWORK(1) ) )
+               CALL DORMQR( 'Left', 'Transpose', NRG, LLNOBR-L, L,
+     $                      DWORK, NRG, DWORK, DWORK, NRG, DWORK, -1,
+     $                      IERR )
+               MAXWRK = MAX( MAXWRK, I + INT( DWORK(1) ) )
+               IF ( MOESP .AND. M.GT.0 ) THEN
+                  CALL MB04ID( MMNOBR, MMNOBR, MNOBR-1, LLNOBR, R, LDR,
+     $                         R, LDR, DWORK, DWORK, -1, IERR )
+                  MAXWRK = MAX( MAXWRK, MMNOBR + INT( DWORK(1) ) )
+               END IF
+            ELSE IF( LDWORK.LT.MINWRK ) THEN
+               INFO = -16
+            END IF
          END IF
       END IF
 C
@@ -365,9 +393,17 @@ C     Return if there are illegal arguments.
 C
       IF( INFO.NE.0 ) THEN
          NSMPSM = 0
+         IF( .NOT.ONEBCH ) THEN
+            IWORK(1) = 1
+            IWORK(2) = MAXWRK
+            IWORK(3) = NSMPSM
+         END IF
          IF ( INFO.EQ.-16 )
-     $      DWORK( 1 ) = MINWRK
+     $      DWORK(1) = MINWRK
          CALL XERBLA( 'IB01MY', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = MAXWRK
          RETURN
       END IF
 C
@@ -672,6 +708,9 @@ C
 C        Return to get new data.
 C
          ICYCLE = ICYCLE + 1
+         IWORK(1) = ICYCLE
+         IWORK(2) = MAXWRK
+         IWORK(3) = NSMPSM
          IF ( ICYCLE.GT.MAXCYC )
      $      IWARN = 1
          RETURN
@@ -779,7 +818,7 @@ C
 C           Reduce the first M columns of the matrix G1 of positive
 C           generators to an upper triangular form.
 C           Workspace: need   (M+L)*4*NOBR*(M+L+1)+2*M;
-C                   prefer (M+L)*4*NOBR*(M+L+1)+M+M*NB.
+C                      prefer (M+L)*4*NOBR*(M+L+1)+M+M*NB.
 C
             INGC = ING
             CALL DGEQRF( NRG, M, DWORK(IPG), NRG, DWORK(ITAU),
@@ -1088,6 +1127,11 @@ C     Return optimal workspace in  DWORK(1).
 C
       DWORK( 1 ) = MAXWRK
       MAXWRK = 1
+      IF( .NOT.ONEBCH ) THEN
+         IWORK(1) = ICYCLE
+         IWORK(2) = MAXWRK
+         IWORK(3) = NSMPSM
+      END IF
       RETURN
 C
 C *** Last line of IB01MY ***

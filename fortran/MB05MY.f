@@ -1,24 +1,6 @@
       SUBROUTINE MB05MY( BALANC, N, A, LDA, WR, WI, R, LDR, Q, LDQ,
      $                   DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute, for an N-by-N real nonsymmetric matrix A, the
@@ -92,12 +74,18 @@ C     Workspace
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if INFO = 0, DWORK(1) returns the optimal LDWORK.
-C             If BALANC = 'S', DWORK(2),...,DWORK(N+1) return the
-C             scaling factors used for balancing.
+C             If BALANC = 'S' and LDWORK > 0, DWORK(2),...,DWORK(N+1)
+C             return the scaling factors used for balancing.
 C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.  LDWORK >= max(1,4*N).
 C             For good performance, LDWORK must generally be larger.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -136,7 +124,7 @@ C     Supersedes Release 2.0 routine MB05AY.
 C
 C     REVISIONS
 C
-C     V. Sima, April 25, 2003, Feb. 15, 2004.
+C     V. Sima, April 25, 2003, Feb. 15, 2004, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -156,9 +144,9 @@ C     .. Array Arguments ..
      $                  R( LDR, * ), WI( * ), WR( * )
 C     ..
 C     .. Local Scalars ..
-      LOGICAL           SCALE, SCALEA
-      INTEGER           HSDWOR, IBAL, IERR, IHI, ILO, ITAU, JWORK, K,
-     $                  MAXB, MAXWRK, MINWRK, NOUT
+      LOGICAL           LQUERY, SCALE, SCALEA
+      INTEGER           IBAL, IERR, IHI, ILO, ITAU, JWORK, K, MAXWRK,
+     $                  MINWRK, NOUT
       DOUBLE PRECISION  ANRM, BIGNUM, CSCALE, EPS, SMLNUM
 C     ..
 C     .. Local Arrays ..
@@ -167,16 +155,15 @@ C     .. Local Arrays ..
 C     ..
 C     .. External Functions ..
       LOGICAL           LSAME
-      INTEGER           ILAENV
       DOUBLE PRECISION  DLAMCH, DLANGE
-      EXTERNAL          DLAMCH, DLANGE, ILAENV, LSAME
+      EXTERNAL          DLAMCH, DLANGE, LSAME
 C     ..
 C     .. External Subroutines ..
       EXTERNAL          DGEBAL, DGEHRD, DHSEQR, DLABAD, DLACPY, DLASCL,
      $                  DORGHR, DTREVC, XERBLA
 C     ..
 C     .. Intrinsic Functions ..
-      INTRINSIC         MAX, MIN, SQRT
+      INTRINSIC         INT, MAX, MIN, SQRT
 C     ..
 C     .. Executable Statements ..
 C
@@ -194,44 +181,46 @@ C
          INFO = -8
       ELSE IF( LDQ.LT.MAX( 1, N ) ) THEN
          INFO = -10
-      END IF
+      ELSE
 C
-C     Compute workspace.
-C      (Note: Comments in the code beginning "Workspace:" describe the
-C       minimal amount of workspace needed at that point in the code,
-C       as well as the preferred amount for good performance.
-C       NB refers to the optimal block size for the immediately
-C       following subroutine, as returned by ILAENV.
-C       HSDWOR refers to the workspace preferred by DHSEQR, as
-C       calculated below. HSDWOR is computed assuming ILO=1 and IHI=N,
-C       the worst case.)
+C        Compute workspace.
+C        (Note: Comments in the code beginning "Workspace:" describe the
+C        minimal amount of workspace needed at that point in the code,
+C        as well as the preferred amount for good performance.
+C        NB refers to the optimal block size for the immediately
+C        following subroutine, as returned by ILAENV.
+C        HSDWOR refers to the workspace preferred by DHSEQR; it is
+C        computed assuming ILO=1 and IHI=N, the worst case.)
 C
-      MINWRK = 1
-      IF( INFO.EQ.0 .AND. LDWORK.GE.1 ) THEN
-         MAXWRK = 2*N + N*ILAENV( 1, 'DGEHRD', ' ', N, 1, N, 0 )
          MINWRK = MAX( 1, 4*N )
-         MAXWRK = MAX( MAXWRK, 2*N+( N-1 )*
-     $            ILAENV( 1, 'DORGHR', ' ', N, 1, N, -1 ) )
-         MAXB = MAX( ILAENV( 8, 'DHSEQR', 'SV', N, 1, N, -1 ), 2 )
-         K = MIN( MAXB, N, MAX( 2, ILAENV( 4, 'DHSEQR', 'SV', N, 1,
-     $       N, -1 ) ) )
-         HSDWOR = MAX( K*( K+2 ), 2*N )
-         MAXWRK = MAX( MAXWRK, N+1, N+HSDWOR )
-         MAXWRK = MAX( MAXWRK, 4*N )
-         DWORK( 1 ) = MAXWRK
+         LQUERY = LDWORK.EQ.-1
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY ) THEN
+            INFO = -12
+         ELSE IF( LQUERY ) THEN
+            CALL DGEHRD( N, 1, N, A, LDA, DWORK, DWORK, -1, INFO )
+            MAXWRK = INT( DWORK( 1 ) )
+            CALL DORGHR( N, 1, N, Q, LDQ, DWORK, DWORK, -1, INFO )
+            MAXWRK = 2*N + MAX( MAXWRK, INT( DWORK( 1 ) ) )
+            CALL DHSEQR( 'S', 'V', N, 1, N, A, LDA, WR, WI, Q, LDQ,
+     $                  DWORK,  -1, INFO )
+            MAXWRK = MAX( MAXWRK, N + INT( DWORK( 1 ) ), MINWRK )
+         END IF
       END IF
-      IF( LDWORK.LT.MINWRK ) THEN
-         INFO = -12
-      END IF
+C
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'MB05MY', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK( 1 ) = MAXWRK
          RETURN
       END IF
 C
 C     Quick return if possible.
 C
-      IF( N.EQ.0 )
-     $   RETURN
+      IF( N.EQ.0 ) THEN
+         DWORK( 1 ) = ONE
+         RETURN
+      END IF
 C
 C     Get machine constants.
 C
@@ -265,10 +254,11 @@ C
 C     Reduce to upper Hessenberg form.
 C     (Workspace: need 3*N, prefer 2*N+N*NB)
 C
-      ITAU = IBAL + N
+      ITAU  = IBAL + N
       JWORK = ITAU + N
       CALL DGEHRD( N, ILO, IHI, A, LDA, DWORK( ITAU ), DWORK( JWORK ),
      $             LDWORK-JWORK+1, IERR )
+      MAXWRK = INT( DWORK( JWORK ) )
 C
 C     Compute right eigenvectors of T.
 C     Copy Householder vectors to Q.
@@ -280,6 +270,7 @@ C     (Workspace: need 3*N-1, prefer 2*N+(N-1)*NB)
 C
       CALL DORGHR( N, ILO, IHI, Q, LDQ, DWORK( ITAU ), DWORK( JWORK ),
      $             LDWORK-JWORK+1, IERR )
+      MAXWRK = 2*N + MAX( MAXWRK, INT( DWORK( JWORK ) ) )
 C
 C     Perform QR iteration, accumulating Schur vectors in Q.
 C     (Workspace: need N+1, prefer N+HSDWOR (see comments) )
@@ -287,6 +278,7 @@ C
       JWORK = ITAU
       CALL DHSEQR( 'S', 'V', N, ILO, IHI, A, LDA, WR, WI, Q, LDQ,
      $             DWORK( JWORK ), LDWORK-JWORK+1, INFO )
+      MAXWRK = MAX( MAXWRK, N + INT( DWORK( JWORK ) ), MINWRK )
 C
 C     If INFO > 0 from DHSEQR, then quit.
 C

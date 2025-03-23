@@ -1,24 +1,6 @@
       SUBROUTINE MB02JD( JOB, K, L, M, N, P, S, TC, LDTC, TR, LDTR, Q,
      $                   LDQ, R, LDR, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a lower triangular matrix R and a matrix Q with
@@ -142,6 +124,12 @@ C                If P > 0,
 C                   LDWORK >= 1 + (N-1)*L*( L + 2*K ) + 6*L + (N-P)*L.
 C             For optimum performance LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -184,7 +172,8 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, June 2001.
 C     D. Kressner, Technical Univ. Berlin, Germany, July 2002.
-C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2004.
+C     V. Sima, Research Institute for Informatics, Bucharest, Mar. 2004,
+C     Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -207,7 +196,7 @@ C     .. Local Scalars ..
       INTEGER           COLR, I, IERR, KK, LEN, NB, NBMIN, PDQ, PDW,
      $                  PNQ, PNR, PRE, PT, RNK, SHFR, STPS, WRKMIN,
      $                  WRKOPT
-      LOGICAL           COMPQ
+      LOGICAL           COMPQ, LQUERY
 C     .. Local Arrays ..
       INTEGER           IPVT(1)
 C     .. External Functions ..
@@ -215,8 +204,8 @@ C     .. External Functions ..
       INTEGER           ILAENV
       EXTERNAL          ILAENV, LSAME
 C     .. External Subroutines ..
-      EXTERNAL          DGEQRF, DLACPY, DLASET, DORGQR, MA02AD, MB02CU,
-     $                  MB02CV, MB02KD, XERBLA
+      EXTERNAL          DGELQF, DGEQRF, DLACPY, DLASET, DORGQR, MA02AD,
+     $                  MB02CU, MB02CV, MB02KD, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC         DBLE, INT, MAX, MIN
 C
@@ -261,15 +250,84 @@ C
          INFO = -13
       ELSE IF ( LDR.LT.MAX( 1, MIN( N, N - P + 1 )*L ) ) THEN
          INFO = -15
-      ELSE IF ( LDWORK.LT.WRKMIN ) THEN
-         DWORK(1) = DBLE( WRKMIN )
-         INFO = -17
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF ( LQUERY ) THEN
+            WRKOPT = 1
+            IF ( M*K.LE.L ) THEN
+               PDW = M*K*L + M*K
+               CALL DGEQRF( M*K, L, DWORK, M*K, DWORK, DWORK, -1, IERR )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW )
+               CALL DORGQR( M*K, M*K, M*K, DWORK, M*K, DWORK, DWORK, -1,
+     $                      IERR )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW )
+               IF ( N.GT.1 ) THEN
+                  PDW = M*K*M*K
+                  CALL MB02KD( 'Row', 'Transpose', K, L, M, N-1, M*K,
+     $                         ONE, ZERO, TC, LDTC, TR, LDTR, DWORK,
+     $                         M*K, R, LDR, DWORK, -1, IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW )
+               END IF
+C
+            ELSE IF ( P.EQ.0 ) THEN
+               IF ( COMPQ ) THEN
+                  CALL DGEQRF( M*K, L, Q, LDQ, DWORK, DWORK, -1, IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + L )
+                  CALL DORGQR( M*K, L, L, Q, LDQ, DWORK, DWORK, -1,
+     $                        IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + L )
+                  IF ( N.GT.1 ) THEN
+                     CALL MB02KD( 'Row', 'Transpose', K, L, M, N-1, L,
+     $                            ONE, ZERO, TC, LDTC, TR, LDTR, Q, LDQ,
+     $                            R, LDR, DWORK, LDWORK, IERR )
+                     WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
+                  END IF
+               ELSE
+                  PDW = M*K*L
+                  CALL DGEQRF( M*K, L, DWORK, M*K, DWORK, DWORK, -1,
+     $                        IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW + L )
+                  CALL DORGQR( M*K, L, L, DWORK, M*K, DWORK, DWORK, -1,
+     $                         IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW + L )
+                  IF ( N.GT.1 ) THEN
+                     CALL MB02KD( 'Row', 'Transpose', K, L, M, N-1, L,
+     $                            ONE, ZERO, TC, LDTC, TR, LDTR, DWORK,
+     $                            M*K, R, LDR, DWORK, -1, IERR )
+                     WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + PDW )
+                  END IF
+               END IF
+               PRE = 1
+            END IF
+C
+            IF ( M*K.GT.L .OR. P.GT.0 .OR.
+     $         ( P.EQ.0 .AND. N.GT.1 ) ) THEN
+               PRE = MAX( 1, P )
+               IF ( COMPQ ) THEN
+                  PDW = ( 2*K + L )*( ( N - 1 )*L + M*K ) + 1
+                  LEN = MAX( L + M*K, ( N - PRE + 1 )*L )
+               ELSE
+                  PDW = ( 2*K + L )*( N - 1 )*L + 1
+                  LEN = ( N - PRE + 1 )*L
+               END IF
+C
+               CALL DGELQF( LEN, L, DWORK, MAX( 1, LEN ), DWORK, DWORK,
+     $                      -1, IERR )
+               WRKOPT = MAX( WRKOPT, PDW + 6*L + INT( DWORK(1) ) )
+            END IF
+         ELSE IF ( LDWORK.LT.WRKMIN ) THEN
+            DWORK(1) = DBLE( WRKMIN )
+            INFO = -17
+         END IF
       END IF
 C
 C     Return if there were illegal values.
 C
       IF ( INFO .NE. 0 ) THEN
          CALL XERBLA( 'MB02JD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = WRKOPT
          RETURN
       END IF
 C
@@ -301,8 +359,8 @@ C
             CALL MB02KD( 'Row', 'Transpose', K, L, M, N-1, M*K, ONE,
      $                   ZERO, TC, LDTC, TR, LDTR, DWORK, M*K, R(L+1,1),
      $                   LDR, DWORK(PDW), LDWORK-PDW+1, IERR )
+            WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
          END IF
-         WRKOPT   = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
          DWORK(1) = DBLE( WRKOPT )
          RETURN
       END IF
@@ -326,8 +384,8 @@ C
                CALL MB02KD( 'Row', 'Transpose', K, L, M, N-1, L, ONE,
      $                      ZERO, TC, LDTC, TR, LDTR, Q, LDQ, R(L+1,1),
      $                      LDR, DWORK, LDWORK, IERR )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
             END IF
-            WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
          ELSE
             PDW = M*K*L + 1
             CALL DLACPY( 'All', M*K, L, TC, LDTC, DWORK, M*K )
@@ -343,8 +401,8 @@ C
      $                      ZERO, TC, LDTC, TR, LDTR, DWORK, M*K,
      $                      R(L+1,1), LDR, DWORK(PDW), LDWORK-PDW+1,
      $                      IERR )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
             END IF
-            WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
          END IF
 C
 C        Quick return if N = 1.
@@ -420,11 +478,7 @@ C
       ELSE
          LEN = ( N - PRE + 1 )*L
       END IF
-      NB = MIN( ILAENV( 1, 'DGELQF', ' ', LEN, L, -1, -1 ), L )
-      KK = PDW + 6*L - 1
-      WRKOPT = MAX( WRKOPT, KK + LEN*NB )
-      KK = LDWORK - KK
-      IF ( KK.LT.LEN*NB )  NB = KK / LEN
+      NB    = MIN( ( LDWORK - PDW - 6*L + 1 ) / LEN, L )
       NBMIN = MAX( 2, ILAENV( 2, 'DGELQF', ' ', LEN, L, -1, -1 ) )
       IF ( NB.LT.NBMIN )  NB = 0
       COLR = L + 1

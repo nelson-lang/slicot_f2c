@@ -2,24 +2,6 @@
      $                   B, LDB, C, LDC, Q, LDQ, Z, LDZ, RANKE, RNKA22,
      $                   TOL, IWORK, DWORK, ZWORK, LZWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute for the descriptor system (A-lambda E,B,C)
@@ -284,7 +266,8 @@ C     Bucharest, Nov. 2008.
 C
 C     REVISIONS
 C
-C     -
+C     V. Sima, Research Institute for Informatics, Bucharest, Apr. 2011,
+C     Feb. 2017.
 C
 C     KEYWORDS
 C
@@ -313,15 +296,14 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       LOGICAL            ILQ, ILZ, LQUERY, REDA, REDTR, WITHB, WITHC
       INTEGER            I, ICOMPQ, ICOMPZ, IR1, IRE1, J, K, KW, LA22,
-     $                   LH, LN, LWR, NA22, NB, WRKOPT
+     $                   LH, LN, LWR, NA22, WRKOPT
       DOUBLE PRECISION   SVLMAX, TOLDEF
 C     .. Local Arrays ..
       DOUBLE PRECISION   SVAL(3)
 C     .. External Functions ..
       LOGICAL            LSAME
-      INTEGER            ILAENV
       DOUBLE PRECISION   DLAMCH, ZLANGE
-      EXTERNAL           DLAMCH, ILAENV, LSAME, ZLANGE
+      EXTERNAL           DLAMCH, LSAME, ZLANGE
 C     .. External Subroutines ..
       EXTERNAL           MB3OYZ, XERBLA, ZLASET, ZSWAP, ZTZRZF, ZUNMQR,
      $                   ZUNMRZ
@@ -401,27 +383,34 @@ C
          INFO = -22
       ELSE
          IF( LQUERY ) THEN
-            NB = MIN( 64, ILAENV( 1, 'ZUNMQR', 'LC', L, N, LN, -1 ) )
-            WRKOPT = MAX( WRKOPT, LN + N*NB )
+            CALL ZUNMQR( 'Left', 'ConjTranspose', L, N, LN, E, LDE,
+     $                   ZWORK, A, LDA, ZWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, LN + INT( ZWORK(1) ) )
             IF( WITHB ) THEN
-               NB = MIN( 64, ILAENV( 1, 'ZUNMQR', 'LC', L, M, LN, -1 ) )
-               WRKOPT = MAX( WRKOPT, LN + M*NB )
+               CALL ZUNMQR( 'Left', 'ConjTranspose', L, M, LN, E, LDE,
+     $                      ZWORK, B, LDB, ZWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, LN + INT( ZWORK(1) ) )
             END IF
             IF( ILQ ) THEN
-               NB = MIN( 64, ILAENV( 1, 'ZUNMQR', 'RN', L, L, LN, -1 ) )
-               WRKOPT = MAX( WRKOPT, LN + L*NB )
+               CALL ZUNMQR( 'Right', 'No Transpose', L, L, LN, E, LDE,
+     $                      ZWORK, Q, LDQ, ZWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, LN + INT( ZWORK(1) ) )
             END IF
-            NB = ILAENV( 1, 'ZGERQF', ' ', L, N, -1, -1 )
-            WRKOPT = MAX( WRKOPT, LN + N*NB )
-            NB = MIN( 64, ILAENV( 1, 'ZUNMRQ', 'RC', L, N, N, -1 ) )
-            WRKOPT = MAX( WRKOPT, N + MAX( 1, L )*NB )
+            K = MIN( L, N-1 )
+            CALL ZTZRZF( K, N, E, LDE, ZWORK, ZWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, LN + INT( ZWORK(1) ) )
+            CALL ZUNMRZ( 'Right', 'Conjugate transpose', L, N, K, N, E,
+     $                   LDE, ZWORK, A, LDA, ZWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, N + INT( ZWORK(1) ) )
             IF( WITHC ) THEN
-               NB = MIN( 64, ILAENV( 1, 'ZUNMRQ', 'RC', P, N, N, -1 ) )
-               WRKOPT = MAX( WRKOPT, N + MAX( 1, P )*NB )
+               CALL ZUNMRZ( 'Right', 'Conjugate transpose', P, N, K, N,
+     $                      E, LDE, ZWORK, C, LDC, ZWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, N + INT( ZWORK(1) ) )
             END IF
             IF( ILZ ) THEN
-               NB = MIN( 64, ILAENV( 1, 'ZUNMRQ', 'RC', N, N, N, -1 ) )
-               WRKOPT = MAX( WRKOPT, N + MAX( 1, N )*NB )
+               CALL ZUNMRZ( 'Right', 'Conjugate transpose', N, N, K, N,
+     $                      E, LDE, ZWORK, Z, LDZ, ZWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, N + INT( ZWORK(1) ) )
             END IF
          ELSE IF( LZWORK.LT.WRKOPT ) THEN
             INFO = -26
@@ -459,11 +448,7 @@ C
          TOLDEF = DBLE( L*N )*DLAMCH( 'EPSILON' )
       END IF
 C
-C     Set the estimate of maximum singular value of E to
-C     max(||E||,||A||) to detect negligible A or E matrices.
-C
-      SVLMAX = MAX( ZLANGE( 'F', L, N, E, LDE, DWORK ),
-     $              ZLANGE( 'F', L, N, A, LDA, DWORK ) )
+      SVLMAX = ZERO
 C
 C     Compute the rank-revealing QR decomposition of E,
 C
@@ -609,6 +594,10 @@ C           condition estimation.
 C           Complex Workspace: MIN(L,N) + 3*N - 1.
 C           Real Workspace:    2*N.
 C
+C           Set the estimate of maximum singular value of A to detect 
+C           a negligible A matrix.
+C
+            SVLMAX = ZLANGE( 'Frobenius', L, N, A, LDA, DWORK )
             IR1 = RANKE + 1
             CALL MB3OYZ( LA22, NA22, A(IR1,IR1), LDA, TOLDEF,
      $                   SVLMAX, RNKA22, SVAL, IWORK, ZWORK,

@@ -1,24 +1,6 @@
       SUBROUTINE MB04ID( N, M, P, L, A, LDA, B, LDB, TAU, DWORK, LDWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute a QR factorization of an n-by-m matrix A (A = Q * R),
@@ -136,7 +118,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Jan. 2009,
-C     Apr. 2009.
+C     Apr. 2009, Apr. 2011.
 C
 C     KEYWORDS
 C
@@ -153,11 +135,8 @@ C     .. Array Arguments ..
       DOUBLE PRECISION  A(LDA,*), B(LDB,*), DWORK(*), TAU(*)
 C     .. Local Scalars ..
       LOGICAL           LQUERY
-      INTEGER           I, NB, WRKOPT
+      INTEGER           I, WRKOPT
       DOUBLE PRECISION  FIRST
-C     .. External Functions ..
-      INTEGER           ILAENV
-      EXTERNAL          ILAENV
 C     .. External Subroutines ..
       EXTERNAL          DGEQRF, DLARF, DLARFG, DORMQR, XERBLA
 C     .. Intrinsic Functions ..
@@ -167,7 +146,7 @@ C
 C     Test the input scalar arguments.
 C
       INFO = 0
-      LQUERY = ( LDWORK.EQ.-1 )
+      LQUERY = LDWORK.EQ.-1
       IF( N.LT.0 ) THEN
          INFO = -1
       ELSE IF( M.LT.0 ) THEN
@@ -184,12 +163,12 @@ C
          I = MAX( 1, M - 1, M - P, L )
          IF( LQUERY ) THEN
             IF( M.GT.P ) THEN
-               NB = ILAENV( 1, 'DGEQRF', ' ', N-P, M-P, -1, -1 )
-               WRKOPT = MAX( I, ( M - P )*NB )
+               CALL DGEQRF( N-P, M-P, A, LDA, TAU, DWORK, -1, INFO )
+               WRKOPT = MAX( I, INT( DWORK( 1 ) ) )
                IF ( L.GT.0 ) THEN
-                  NB = MIN( 64, ILAENV( 1, 'DORMQR', 'LT', N-P, L,
-     $                                  MIN(N,M)-P, -1 ) )
-                  WRKOPT = MAX( WRKOPT, MAX( 1, L )*NB )
+                  CALL DORMQR( 'Left', 'Transpose', N-P, L, MIN(N,M)-P,
+     $                         A, LDA, TAU, B, LDB, DWORK, -1, INFO )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK( 1 ) ) )
                END IF
             END IF
          ELSE IF( LDWORK.LT.I ) THEN

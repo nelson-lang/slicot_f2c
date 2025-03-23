@@ -2,24 +2,6 @@
      $                   LDT, U, LDU, G, LDG, Q, LDQ, X, LDX, SEP,
      $                   RCOND, FERR, IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To estimate the conditioning and compute an error bound on the
@@ -202,6 +184,12 @@ C                LDWORK  = MAX(1, 2*N*N),  if JOB = 'C';
 C                LDWORK  = MAX(1, 4*N*N ), if JOB = 'E' or 'B'.
 C             For good performance, LDWORK must generally be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error indicator
 C
 C     INFO    INTEGER
@@ -291,7 +279,8 @@ C     V. Sima, Katholieke Univ. Leuven, Belgium, February 1999.
 C
 C     REVISIONS
 C
-C     V. Sima, Research Institute for Informatics, Bucharest, Oct. 2004.
+C     V. Sima, Research Institute for Informatics, Bucharest, Oct. 2004,
+C     Apr. 2011, May 2020.
 C
 C     KEYWORDS
 C
@@ -301,9 +290,9 @@ C
 C     ******************************************************************
 C
 C     .. Parameters ..
-      DOUBLE PRECISION   ZERO, ONE, TWO, FOUR, HALF
-      PARAMETER          ( ZERO = 0.0D+0, ONE = 1.0D+0, TWO = 2.0D+0,
-     $                     FOUR = 4.0D+0, HALF = 0.5D+0 )
+      DOUBLE PRECISION   ZERO, ONE, FOUR, HALF
+      PARAMETER          ( ZERO = 0.0D+0, ONE = 1.0D+0, FOUR = 4.0D+0,
+     $                     HALF = 0.5D+0 )
 C     ..
 C     .. Scalar Arguments ..
       CHARACTER          FACT, JOB, LYAPUN, TRANA, UPLO
@@ -317,8 +306,8 @@ C     .. Array Arguments ..
      $                   X( LDX, * )
 C     ..
 C     .. Local Scalars ..
-      LOGICAL            JOBB, JOBC, JOBE, LOWER, NEEDAC, NOFACT,
-     $                   NOTRNA, UPDATE
+      LOGICAL            JOBB, JOBC, JOBE, LOWER, LQUERY, NEEDAC,
+     $                   NOFACT, NOTRNA, UPDATE
       CHARACTER          LOUP, SJOB, TRANAT
       INTEGER            I, IABS, INFO2, IRES, ITMP, IXBS, J, JJ, JX,
      $                   KASE, LDW, LWA, NN, SDIM, WRKOPT
@@ -328,6 +317,7 @@ C     .. Local Scalars ..
 C     ..
 C     .. Local Arrays ..
       LOGICAL            BWORK( 1 )
+      INTEGER            ISAVE( 3 )
 C     ..
 C     .. External Functions ..
       LOGICAL            LSAME, SELECT
@@ -335,7 +325,7 @@ C     .. External Functions ..
       EXTERNAL           DLAMCH, DLANGE, DLANHS, DLANSY, LSAME, SELECT
 C     ..
 C     .. External Subroutines ..
-      EXTERNAL           DAXPY, DCOPY, DGEES, DLACON, DLACPY, DSCAL,
+      EXTERNAL           DAXPY, DCOPY, DGEES, DLACN2, DLACPY, DSCAL,
      $                   DSYMM, DSYR2K, MA02ED, MB01RU, MB01UD, SB03MY,
      $                   SB03QX, SB03QY, XERBLA
 C     ..
@@ -404,12 +394,27 @@ C
          INFO = -16
       ELSE IF( LDX.LT.MAX( 1, N ) ) THEN
          INFO = -18
-      ELSE IF( LDWORK.LT.MAX( 1, LDW ) ) THEN
-         INFO = -24
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         IF( UPDATE ) THEN
+            SJOB = 'V'
+         ELSE
+            SJOB = 'N'
+         END IF
+         IF( LQUERY .AND. NOFACT ) THEN
+            CALL DGEES( SJOB, 'Not ordered', SELECT, N, T, LDT, SDIM,
+     $                  DWORK, DWORK, U, LDU, DWORK, -1, BWORK, INFO )
+            WRKOPT = MAX( 1, LDW, INT( DWORK( 1 ) ) + LWA + 2*N )
+         END IF
+         IF( LDWORK.LT.MAX( 1, LDW ) .AND. .NOT. LQUERY )
+     $      INFO = -24
       END IF
 C
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'SB02QD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK( 1 ) = WRKOPT
          RETURN
       END IF
 C
@@ -486,11 +491,6 @@ C        (Note: Comments in the code beginning "Workspace:" describe the
 C        minimal amount of real workspace needed at that point in the
 C        code, as well as the preferred amount for good performance.)
 C
-         IF( UPDATE ) THEN
-            SJOB = 'V'
-         ELSE
-            SJOB = 'N'
-         END IF
          CALL DGEES( SJOB, 'Not ordered', SELECT, N, T, LDT, SDIM,
      $               DWORK( LWA+1 ), DWORK( LWA+N+1 ), U, LDU,
      $               DWORK( LWA+2*N+1 ), LDWORK-LWA-2*N, BWORK, INFO )
@@ -539,7 +539,8 @@ C
 C
 C        REPEAT
    10    CONTINUE
-         CALL DLACON( NN, DWORK( ITMP+1 ), DWORK, IWORK, EST, KASE )
+         CALL DLACN2( NN, DWORK( ITMP+1 ), DWORK, IWORK, EST, KASE,
+     $                ISAVE )
          IF( KASE.NE.0 ) THEN
 C
 C           Select the triangular part of symmetric matrix to be used.

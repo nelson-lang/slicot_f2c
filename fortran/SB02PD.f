@@ -2,24 +2,6 @@
      $                   LDX, RCOND, FERR, WR, WI, IWORK, DWORK, LDWORK,
      $                   INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To solve the real continuous-time matrix algebraic Riccati
@@ -140,10 +122,16 @@ C
 C     LDWORK  INTEGER
 C             The dimension of the array DWORK.
 C             LDWORK >= 4*N*N + 8*N + 1,               if JOB = 'X';
-C             LDWORK >= max( 4*N*N + 8*N, 6*N*N ) + 1, if JOB = 'A'.
+C             LDWORK >= max( 4*N*N + 8*N + 1, 6*N*N ), if JOB = 'A'.
 C             For good performance, LDWORK should be larger, e.g.,
 C             LDWORK >= 4*N*N + 6*N +( 2*N+1 )*NB,     if JOB = 'X',
 C             where NB is the optimal blocksize.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error indicator
 C
@@ -232,7 +220,7 @@ C     P. Petkov, Tech. University of Sofia, March 2000.
 C
 C     REVISIONS
 C
-C     V. Sima, Katholieke Univ. Leuven, Belgium, June 2000.
+C     V. Sima, Katholieke Univ. Leuven, Belgium, June 2000; Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -259,7 +247,7 @@ C     .. Array Arguments ..
      $                   Q( LDQ, * ), WI( * ), WR( * ), X( LDX, * )
 C     ..
 C     .. Local Scalars ..
-      LOGICAL            ALL, LOWER, NOTRNA
+      LOGICAL            ALL, LOWER, LQUERY, NOTRNA
       CHARACTER          EQUED, LOUP
       INTEGER            I, IAF, IB, IBR, IC, IFR, IJ, IJ1, IJ2, INFO2,
      $                   INI, IR, ISCL, ISV, IT, ITAU, ITER, IU, IWRK,
@@ -272,9 +260,8 @@ C     .. Local Arrays ..
 C     ..
 C     .. External Functions ..
       LOGICAL            LSAME, SELECT
-      INTEGER            ILAENV
       DOUBLE PRECISION   DLAMCH, DLANSY
-      EXTERNAL           DLAMCH, DLANSY, ILAENV, LSAME, SELECT
+      EXTERNAL           DLAMCH, DLANSY, LSAME, SELECT
 C     ..
 C     .. External Subroutines ..
       EXTERNAL           DCOPY, DGEES, DGEQP3, DGESVX, DLACPY, DLASCL,
@@ -291,6 +278,7 @@ C
       ALL    = LSAME( JOB,   'A' )
       NOTRNA = LSAME( TRANA, 'N' )
       LOWER  = LSAME( UPLO,  'L' )
+      LQUERY = LDWORK.EQ.-1
 C
       INFO = 0
       IF( .NOT.ALL .AND. .NOT.LSAME( JOB, 'X' ) ) THEN
@@ -314,17 +302,43 @@ C
 C
 C        Compute workspace.
 C
+         N2 = 2*N
          IF( ALL ) THEN
-            MINWRK = MAX( 4*N*N + 8*N + 1, 6*N*N )
+            MINWRK = MAX( N2*N2 + 8*N + 1, 6*N*N )
          ELSE
-            MINWRK = 4*N*N + 8*N + 1
+            MINWRK = N2*N2 + 8*N + 1
          END IF
-         IF( LDWORK.LT.MINWRK ) THEN
-            INFO = -19
+         ITAU = N2*N2
+         IWRK = ITAU + N2
+         IF ( LQUERY ) THEN
+            CALL DSYTRF( UPLO, N2, DWORK, N2, IWORK, DWORK, -1, INFO2 )
+            LWAMAX = INT( DWORK( 1 ) )
+            CALL DGEQP3( N2, N2, DWORK, N2, IWORK, DWORK, DWORK, -1,
+     $                   INFO2 )
+            LWAMAX = MAX( INT( DWORK( 1 ) ), LWAMAX )
+            CALL DORMQR( 'L', 'N', N2, N, N, DWORK, N2, DWORK, DWORK,
+     $                   N2, DWORK, -1, INFO2 )
+            LWAMAX = MAX( IWRK + MAX( INT( DWORK( 1 ) ), LWAMAX ),
+     $                    MINWRK )
+            IF( ALL ) THEN
+               CALL DGEES( 'V', 'N', SELECT, N, DWORK, N, SDIM, WR, WI,
+     $                     DWORK, N, DWORK, -1, BWORK, INFO2 )
+               LWAMAX = MAX( N2*N + INT( DWORK( 1 ) ), LWAMAX )
+               CALL SB02QD( 'B', 'F', TRANA, UPLO, 'O', N, A, LDA,
+     $                      DWORK, N, DWORK, N, G, LDG, Q, LDQ, X, LDX,
+     $                      SEP, RCOND, FERR, IWORK, DWORK, -1, INFO2 )
+               LWAMAX = MAX( N2*N + INT( DWORK( 1 ) ), LWAMAX )
+            END IF
          END IF
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY )
+     $      INFO = -19
       END IF
+C
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'SB02PD', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = LWAMAX
          RETURN
       END IF
 C
@@ -348,8 +362,6 @@ C     Compute the square-roots of the norms of the matrices Q and G .
 C
       QNORM2 = SQRT( DLANSY( '1', UPLO, N, Q, LDQ, DWORK ) )
       GNORM2 = SQRT( DLANSY( '1', UPLO, N, G, LDG, DWORK ) )
-C
-      N2 = 2*N
 C
 C     Construct the lower (if UPLO = 'L') or upper (if UPLO = 'U')
 C     triangle of the symmetric block-permuted Hamiltonian matrix.
@@ -460,13 +472,6 @@ C
          ISCL = 1
       END IF
 C
-C     Workspace usage.
-C
-      ITAU = N2*N2
-      IWRK = ITAU + N2
-C
-      LWAMAX = N2*ILAENV( 1, 'DSYTRF', UPLO, N2, -1, -1, -1 )
-C
 C     Compute the matrix sign function.
 C
       DO 230 ITER = 1, MAXIT
@@ -504,6 +509,7 @@ C
             INFO = 1
             RETURN
          END IF
+         LWAMAX = MAX( LWAMAX, IWRK + INT( DWORK( IWRK+1 ) ) )
 C
 C        Workspace: need   4*N*N + 4*N.
 C
@@ -642,7 +648,7 @@ C
 C
       CALL DGEQP3( N2, N2, DWORK, N2, IWORK, DWORK( ITAU+1 ),
      $             DWORK( IWRK+1 ), LDWORK-IWRK, INFO2 )
-      LWAMAX = MAX( INT( DWORK( IWRK+1 ) ), LWAMAX )
+      LWAMAX = MAX( LWAMAX, IWRK + INT( DWORK( IWRK+1 ) ) )
 C
 C     Accumulate the orthogonal transformations. Note that only the
 C     first N columns of the array DWORK, returned by DGEQP3, are
@@ -657,7 +663,7 @@ C
       CALL DORMQR( 'L', 'N', N2, N, N, DWORK, N2, DWORK( ITAU+1 ),
      $             DWORK( IAF+1 ), N2, DWORK( IWRK+1 ), LDWORK-IWRK,
      $             INFO2 )
-      LWAMAX = IWRK + MAX( INT( DWORK( IWRK+1 ) ), LWAMAX )
+      LWAMAX = MAX( LWAMAX, IWRK + INT( DWORK( IWRK+1 ) ) )
 C
 C     Store the matrices V11 and V21' .
 C
@@ -707,7 +713,7 @@ C        Compute the estimates of the reciprocal condition number and
 C        error bound.
 C        Workspace usage.
 C
-         IT   = 1
+         IT   = 0
          IU   = IT + N*N
          IWRK = IU + N*N
 C
@@ -727,7 +733,7 @@ C
          END IF
 C
 C        Compute the Schur factorization of Ac .
-C        Workspace: need   2*N*N + 5*N + 1;
+C        Workspace: need   2*N*N + 5*N;
 C                   prefer larger.
 C
          CALL DGEES( 'V', 'N', SELECT, N, DWORK( IT+1 ), N, SDIM, WR,
@@ -737,17 +743,17 @@ C
             INFO = 4
             RETURN
          END IF
-         LWAMAX = IWRK + MAX( INT( DWORK( IWRK+1 ) ), LWAMAX )
+         LWAMAX = MAX( LWAMAX, IWRK + INT( DWORK( IWRK+1 ) ) )
 C
 C        Estimate the reciprocal condition number and the forward error.
-C        Workspace: need   6*N*N + 1;
+C        Workspace: need   6*N*N;
 C                   prefer larger.
 C
          CALL SB02QD( 'B', 'F', TRANA, UPLO, 'O', N, A, LDA,
      $                DWORK( IT+1 ), N, DWORK( IU+1 ), N, G, LDG, Q,
      $                LDQ, X, LDX, SEP, RCOND, FERR, IWORK,
      $                DWORK( IWRK+1 ), LDWORK-IWRK, INFO2 )
-         LWAMAX = IWRK + MAX( INT( DWORK( IWRK+1 ) ), LWAMAX )
+         LWAMAX = MAX( LWAMAX, IWRK + INT( DWORK( IWRK+1 ) ) )
       END IF
 C
       DWORK( 1 ) = DBLE( LWAMAX )

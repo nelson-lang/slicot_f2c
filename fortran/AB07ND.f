@@ -1,24 +1,6 @@
       SUBROUTINE AB07ND( N, M, A, LDA, B, LDB, C, LDC, D, LDD, RCOND,
      $                   IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the inverse (Ai,Bi,Ci,Di) of a given system (A,B,C,D).
@@ -85,6 +67,12 @@ C     LDWORK  INTEGER
 C             The length of the array DWORK.  LDWORK >= MAX(1,4*M).
 C             For good performance, LDWORK should be larger.
 C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
+C
 C     Error Indicator
 C
 C     INFO    INTEGER
@@ -121,6 +109,7 @@ C
 C     REVISIONS
 C
 C     A. Varga, German Aerospace Center, Oberpfaffenhofen, July 2000.
+C     V. Sima, Research Institute for Informatics, Bucharest, Apr. 2011.
 C
 C     KEYWORDS
 C
@@ -140,17 +129,16 @@ C     .. Array Arguments ..
       INTEGER            IWORK(*)
 C     .. Local Scalars ..
       DOUBLE PRECISION   DNORM
-      INTEGER            BL, CHUNK, I, IERR, J, MAXWRK
-      LOGICAL            BLAS3, BLOCK
+      INTEGER            BL, CHUNK, I, IERR, J, MAXWRK, MINWRK
+      LOGICAL            BLAS3, BLOCK, LQUERY
 C     .. External Functions ..
       DOUBLE PRECISION   DLAMCH, DLANGE
-      INTEGER            ILAENV
-      EXTERNAL           DLAMCH, DLANGE, ILAENV
+      EXTERNAL           DLAMCH, DLANGE
 C     .. External Subroutines ..
       EXTERNAL           DCOPY, DGECON, DGEMM, DGEMV, DGETRF, DGETRI,
      $                   DLACPY, XERBLA
 C     .. Intrinsic Functions ..
-      INTRINSIC          DBLE, MAX, MIN
+      INTRINSIC          INT, MAX, MIN
 C     .. Executable Statements ..
 C
       INFO = 0
@@ -169,8 +157,13 @@ C
          INFO = -8
       ELSE IF( LDD.LT.MAX( 1, M ) ) THEN
          INFO = -10
-      ELSE IF( LDWORK.LT.MAX( 1, 4*M ) ) THEN
-         INFO = -14
+      ELSE
+         LQUERY = LDWORK.EQ.-1
+         MINWRK = MAX( 1, 4*M )
+         CALL DGETRI( M, D, LDD, IWORK, DWORK, -1, IERR )
+         MAXWRK = MAX( MINWRK, INT( DWORK(1) ), N*M )
+         IF( LDWORK.LT.MINWRK .AND. .NOT.LQUERY )
+     $      INFO = -14
       END IF
 C
       IF ( INFO.NE.0 ) THEN
@@ -178,6 +171,9 @@ C
 C        Error return.
 C
          CALL XERBLA( 'AB07ND', -INFO )
+         RETURN
+      ELSE IF( LQUERY ) THEN
+         DWORK(1) = MAXWRK
          RETURN
       END IF
 C
@@ -215,7 +211,6 @@ C     Compute Di = D  .
 C     Workspace: need   M;
 C                prefer M*NB.
 C
-      MAXWRK = MAX( 4*M, M*ILAENV( 1, 'DGETRI', ' ', M, -1, -1, -1 ) )
       CALL DGETRI( M, D, LDD, IWORK, DWORK, LDWORK, IERR )
       IF ( N.GT.0 ) THEN
          CHUNK = LDWORK / M
@@ -296,7 +291,7 @@ C
 C
 C     Return optimal workspace in DWORK(1).
 C
-      DWORK(1) = DBLE( MAX( MAXWRK, N*M ) )
+      DWORK(1) = MAXWRK
       RETURN
 C
 C *** Last line of AB07ND ***

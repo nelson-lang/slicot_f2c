@@ -1,24 +1,6 @@
       SUBROUTINE MB03BC( K, AMAP, S, SINV, A, LDA1, LDA2, MACPAR, CV,
      $                   SV, DWORK )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the product singular value decomposition of the K-1
@@ -29,7 +11,7 @@ C
 C                        S(2)        S(3)            S(K)
 C            A = A(:,:,2)    A(:,:,3)    ... A(:,:,K),
 C
-C     Givens rotators are computed so that
+C     Givens rotations are computed so that
 C                                                          S(i)
 C       [  CV(i-1) SV(i-1) ] [ A(1,1,i)(in)  A(1,2,i)(in) ]
 C       [ -SV(i-1) CV(i-1) ] [     0         A(2,2,i)(in) ]
@@ -87,15 +69,15 @@ C             MACPAR(5)  base of the machine,        DLAMCH( 'B' ).
 C
 C     CV      (output)  DOUBLE PRECISION array, dimension (K)
 C             On exit, the first K elements of this array contain the
-C             cosines of the Givens rotators.
+C             cosines of the Givens rotations.
 C
 C     SV      (output)  DOUBLE PRECISION array, dimension (K)
 C             On exit, the first K elements of this array contain the
-C             sines of the Givens rotators.
+C             sines of the Givens rotations.
 C
 C     Workspace
 C
-C     DWORK   DOUBLE PRECISION array, dimension 3*(K-1)
+C     DWORK   DOUBLE PRECISION array, dimension (3*(K-1))
 C
 C     METHOD
 C
@@ -118,7 +100,7 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Romania,
 C     July 2009, SLICOT Library version of the routine PLAPST.
-C     V. Sima, Nov. 2010.
+C     V. Sima, Nov. 2010, Aug. 2011.
 C
 C     KEYWORDS
 C
@@ -140,9 +122,9 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       INTEGER           AI, I, PW, SCL
       DOUBLE PRECISION  A11, A12, A22, B11, B12, B22, BASE, CC, CL, CR,
-     $                  EPS, MX, MX2, RMAX, RMIN, RMNS, RMXS, S11, S12,
-     $                  S22, SC, SFMN, SL, SR, SSMAX, SSMIN, T11, T12,
-     $                  T22, TEMP, TWOS
+     $                  EPS, MX, MX2, RMAX, RMIN, RMNS, RMXS, S11, S22,
+     $                  SC, SFMN, SL, SR, SSMAX, SSMIN, T11, T12, T22,
+     $                  TEMP, TWOS
 C     .. External Subroutines ..
       EXTERNAL          DLARTG, DLASV2
 C     .. Intrinsic Functions ..
@@ -333,7 +315,6 @@ C     described in [1].
 C
       S11 = T11
       S22 = T22
-      S12 = T12
 C
       CV(K) = CR
       SV(K) = SR
@@ -400,7 +381,6 @@ C
          CV(I-1) = CR
          SV(I-1) = SR
          S11 = T11
-         S12 = T12
          S22 = T22
    80 CONTINUE
 C

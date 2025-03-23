@@ -2,24 +2,6 @@
      $                   B, LDB, C, LDC, Q, LDQ, Z, LDZ, RANKE, RNKA22,
      $                   TOL, IWORK, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute for the descriptor system (A-lambda E,B,C)
@@ -284,7 +266,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, July 1999,
-C     May 2003, Jan. 2009.
+C     May 2003, Jan. 2009, Apr. 2011, Sep. 2016, Nov. 2016, Feb. 2017.
 C
 C     KEYWORDS
 C
@@ -309,15 +291,14 @@ C     .. Array Arguments ..
 C     .. Local Scalars ..
       LOGICAL            ILQ, ILZ, LQUERY, REDA, REDTR, WITHB, WITHC
       INTEGER            I, ICOMPQ, ICOMPZ, IR1, IRE1, J, K, KW, LA22,
-     $                   LH, LN, LWR, NA22, NB, WRKOPT
+     $                   LH, LN, LWR, NA22, WRKOPT
       DOUBLE PRECISION   SVLMAX, TOLDEF
 C     .. Local Arrays ..
       DOUBLE PRECISION   SVAL(3)
 C     .. External Functions ..
       LOGICAL            LSAME
-      INTEGER            ILAENV
       DOUBLE PRECISION   DLAMCH, DLANGE
-      EXTERNAL           DLAMCH, DLANGE, ILAENV, LSAME
+      EXTERNAL           DLAMCH, DLANGE, LSAME
 C     .. External Subroutines ..
       EXTERNAL           DLASET, DORMQR, DORMRZ, DSWAP, DTZRZF, MB03OY,
      $                   XERBLA
@@ -397,27 +378,33 @@ C
          INFO = -22
       ELSE
          IF( LQUERY ) THEN
-            NB = MIN( 64, ILAENV( 1, 'DORMQR', 'LC', L, N, LN, -1 ) )
-            WRKOPT = MAX( WRKOPT, LN + N*NB )
+            CALL DORMQR( 'Left', 'Transpose', L, N, LN, E, LDE, DWORK,
+     $                   A, LDA, DWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, LN + INT( DWORK(1) ) )
             IF( WITHB ) THEN
-               NB = MIN( 64, ILAENV( 1, 'DORMQR', 'LC', L, M, LN, -1 ) )
-               WRKOPT = MAX( WRKOPT, LN + M*NB )
+               CALL DORMQR( 'Left', 'Transpose', L, M, LN, E, LDE,
+     $                      DWORK, B, LDB, DWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, LN + INT( DWORK(1) ) )
             END IF
             IF( ILQ ) THEN
-               NB = MIN( 64, ILAENV( 1, 'DORMQR', 'RN', L, L, LN, -1 ) )
-               WRKOPT = MAX( WRKOPT, LN + L*NB )
+               CALL DORMQR( 'Right', 'No Transpose', L, L, LN, E, LDE,
+     $                      DWORK, Q, LDQ, DWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, LN + INT( DWORK(1) ) )
             END IF
-            NB = ILAENV( 1, 'DGERQF', ' ', L, N, -1, -1 )
-            WRKOPT = MAX( WRKOPT, LN + N*NB )
-            NB = MIN( 64, ILAENV( 1, 'DORMRQ', 'RC', L, N, N, -1 ) )
-            WRKOPT = MAX( WRKOPT, N + MAX( 1, L )*NB )
+            CALL DTZRZF( LN, N, E, LDE, DWORK, DWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, LN + INT( DWORK(1) ) )
+            CALL DORMRZ( 'Right', 'Transpose', L, N, LN, N, E, LDE,
+     $                   DWORK, A, LDA, DWORK, -1, INFO )
+            WRKOPT = MAX( WRKOPT, N + INT( DWORK(1) ) )
             IF( WITHC ) THEN
-               NB = MIN( 64, ILAENV( 1, 'DORMRQ', 'RC', P, N, N, -1 ) )
-               WRKOPT = MAX( WRKOPT, N + MAX( 1, P )*NB )
+               CALL DORMRZ( 'Right', 'Transpose', P, N, LN, N, E, LDE,
+     $                      DWORK, C, LDC, DWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, N + INT( DWORK(1) ) )
             END IF
             IF( ILZ ) THEN
-               NB = MIN( 64, ILAENV( 1, 'DORMRQ', 'RC', N, N, N, -1 ) )
-               WRKOPT = MAX( WRKOPT, N + MAX( 1, N )*NB )
+               CALL DORMRZ( 'Right', 'Transpose', N, N, LN, N, E, LDE,
+     $                      DWORK, Z, LDZ, DWORK, -1, INFO )
+               WRKOPT = MAX( WRKOPT, N + INT( DWORK(1) ) )
             END IF
          ELSE IF( LDWORK.LT.WRKOPT ) THEN
             INFO = -25
@@ -455,11 +442,7 @@ C
          TOLDEF = DBLE( L*N )*DLAMCH( 'EPSILON' )
       END IF
 C
-C     Set the estimate of maximum singular value of E to
-C     max(||E||,||A||) to detect negligible A or E matrices.
-C
-      SVLMAX = MAX( DLANGE( 'F', L, N, E, LDE, DWORK ),
-     $              DLANGE( 'F', L, N, A, LDA, DWORK ) )
+      SVLMAX = ZERO
 C
 C     Compute the rank-revealing QR decomposition of E,
 C
@@ -602,7 +585,12 @@ C           and determine the rank of A22 using incremental
 C           condition estimation.
 C           Workspace: MIN(L,N) + 3*N - 1.
 C
+C           Set the estimate of maximum singular value of A to detect 
+C           a negligible A matrix.
+C
+            SVLMAX = DLANGE( 'Frobenius', L, N, A, LDA, DWORK )
             IR1 = RANKE + 1
+            KW  = MIN( LA22, NA22 ) + 1
             CALL MB03OY( LA22, NA22, A(IR1,IR1), LDA, TOLDEF,
      $                   SVLMAX, RNKA22, SVAL, IWORK, DWORK,
      $                   DWORK(KW), INFO )
@@ -692,16 +680,20 @@ C                 Workspace: need   N + MAX(P,N);
 C                            prefer N + MAX(P,N)*NB.
 C
                   LH = NA22 - RNKA22
+                  CALL DORMRZ( 'Right', 'Transpose', RANKE, NA22,
+     $                         RNKA22, LH, A(IR1,IR1), LDA, DWORK,
+     $                         A(1,IR1), LDA, DWORK(KW), LDWORK-KW+1,
+     $                         INFO )
                   IF( WITHC ) THEN
-                     CALL DORMRZ( 'Right', 'Transpose', P, N, RNKA22,
-     $                            LH, A(IR1,IR1), LDA, DWORK, C, LDC,
-     $                            DWORK(KW), LDWORK-KW+1, INFO )
+                     CALL DORMRZ( 'Right', 'Transpose', P, NA22, RNKA22,
+     $                            LH, A(IR1,IR1), LDA, DWORK, C(1,IR1),
+     $                            LDC, DWORK(KW), LDWORK-KW+1, INFO )
                      WRKOPT = MAX( WRKOPT, INT( DWORK(KW) ) + KW - 1 )
                   END IF
                   IF( ILZ ) THEN
-                     CALL DORMRZ( 'Right', 'Transpose', N, N, RNKA22,
-     $                            LH, A(IR1,IR1), LDA, DWORK, Z, LDZ,
-     $                            DWORK(KW), LDWORK-KW+1, INFO )
+                     CALL DORMRZ( 'Right', 'Transpose', N, NA22, RNKA22,
+     $                            LH, A(IR1,IR1), LDA, DWORK, Z(1,IR1),
+     $                            LDZ, DWORK(KW), LDWORK-KW+1, INFO )
                      WRKOPT = MAX( WRKOPT, INT( DWORK(KW) ) + KW - 1 )
                   END IF
                   IRE1 = RANKE + RNKA22 + 1

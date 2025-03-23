@@ -1,24 +1,6 @@
       SUBROUTINE MB03DD( UPLO, N1, N2, PREC, A, LDA, B, LDB, Q1, LDQ1,
      $                   Q2, LDQ2, DWORK, LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute orthogonal matrices Q1 and Q2 for a real 2-by-2,
@@ -31,7 +13,8 @@ C
 C     such that the pencil a(Q2' A Q1) - b(Q2' B Q1) is still in block
 C     upper triangular form, but the eigenvalues in Spec(A11, B11),
 C     Spec(A22, B22) are exchanged, where Spec(X,Y) denotes the spectrum
-C     of the matrix pencil (X,Y).
+C     of the matrix pencil (X,Y) and the notation M' denotes the
+C     transpose of the matrix M.
 C
 C     Optionally, to upper triangularize the real regular pencil in
 C     block lower triangular form
@@ -132,13 +115,9 @@ C     Error Indicator
 C
 C     INFO    INTEGER
 C             = 0: succesful exit;
-C             = 1: the QZ iteration failed in the LAPACK routine DGGEV;
-C             = 2: another error occured while executing a routine in
-C                  DGGEV;
 C             = 3: the QZ iteration failed in the LAPACK routine DGGES
 C                  (if UPLO <> 'T') or DHGEQZ (if UPLO = 'T');
-C             = 4: another error occured during execution of DGGES or
-C                  DHGEQZ;
+C             = 4: another error occured during execution of DHGEQZ;
 C             = 5: reordering of aA - bB in the LAPACK routine DTGSEN
 C                  failed because the transformed matrix pencil aA - bB
 C                  would be too far from generalized Schur form;
@@ -175,7 +154,9 @@ C
 C     REVISIONS
 C
 C     V. Sima, July 2009 (SLICOT version of the routine DBTUEX).
-C     V. Sima, Nov. 2009, Oct. 2010, Nov. 2010.
+C     V. Sima, Nov. 2009, Oct. 2010, Nov. 2010, Mar. 2016, Apr. 2016,
+C     May 2016.
+C     M. Voigt, Jan. 2012.
 C
 C     KEYWORDS
 C
@@ -199,24 +180,26 @@ C
 C     .. Local Scalars ..
       LOGICAL            AEVINF, EVINF, LTRIU, LUPLO
       INTEGER            CNT, EVSEL, I, IAEV, IDUM, IEVS, ITMP, J, M
-      DOUBLE PRECISION   ABSAEV, ABSEV, ADIF, CO1, CO2, E, G, SI1,
-     $                   SI2, TMP, TOL, TOLB
+      DOUBLE PRECISION   A11, A22, ABSAEV, ABSEV, ADIF, B11, B22, CO,
+     $                   CO1, E, G, MX, NRA, NRB, SFMIN, SI, SI1, TMP,
+     $                   TOL, TOLB
 C
 C     .. Local Arrays ..
       LOGICAL            BWORK( 1 ), OUT( 2 ), SLCT( 4 )
-      INTEGER            IDM( 1 )
-      DOUBLE PRECISION   DUM( 2 )
+      INTEGER            IDM( 2 )
+      DOUBLE PRECISION   AS( 2, 2 ), BS( 2, 2 ), DUM( 8 )
 C
 C     .. External Functions ..
-      LOGICAL            LSAME, SB02OW
-      EXTERNAL           LSAME, SB02OW
+      LOGICAL            LSAME,  SB02OW
+      DOUBLE PRECISION   DLAMCH, DLANGE, DLANHS
+      EXTERNAL           DLAMCH, DLANGE, DLANHS, LSAME, SB02OW
 C
 C     .. External Subroutines ..
-      EXTERNAL           DCOPY, DGGES, DGGEV, DHGEQZ, DLACPY, DLARTG,
-     $                   DLASET, DSWAP, DTGSEN
+      EXTERNAL           DCOPY, DGGES, DHGEQZ, DLACPY, DLAG2, DLARTG,
+     $                   DLASET, DROT, DSWAP, DTGEX2, DTGSEN, MB01QD
 C
 C     .. Intrinsic Functions ..
-      INTRINSIC          ABS, MAX
+      INTRINSIC          ABS, MAX, SIGN
 C
 C     .. Executable Statements ..
 C
@@ -240,7 +223,64 @@ C
          IF( .NOT.LUPLO ) THEN
 C
 C           Make the pencil upper block triangular.
+C           Quick return if A21 = 0 and B21 = 0.
 C
+            IF( DLANGE( '1-norm', N2, N1, A( N1+1, 1 ), LDA, DWORK )
+     $            .EQ.ZERO .AND.
+     $          DLANGE( '1-norm', N2, N1, B( N1+1, 1 ), LDB, DWORK )
+     $            .EQ.ZERO ) THEN
+               IF( N1.EQ.2 ) THEN
+                  CALL DGGES( 'Vectors', 'Vectors', 'Not sorted',
+     $                        SB02OW, N1, A, LDA, B, LDB, IDUM, DWORK,
+     $                        DWORK( M+1 ), DWORK( 2*M+1 ), Q2, LDQ2,
+     $                        Q1, LDQ1, DWORK( 3*M+1 ), LDWORK-2*M,
+     $                        BWORK, INFO )
+                  IF( INFO.NE.0 ) THEN
+                     IF( INFO.GE.1 .AND. INFO.LE.N1 ) THEN
+                        INFO = 3
+                        RETURN
+                     ELSE
+                        INFO = 4
+                        RETURN
+                     END IF
+                  END IF
+                  IF( N2.EQ.1 ) THEN
+                     Q1( 3, 3 ) = ONE
+                     Q2( 3, 3 ) = ONE
+                  END IF
+               END IF
+               IF( N2.EQ.2 ) THEN
+                  CALL DGGES( 'Vectors', 'Vectors', 'Not sorted',
+     $                        SB02OW, N2, A( N1+1, N1+1 ), LDA,
+     $                        B( N1+1, N1+1 ), LDB, IDUM, DWORK( N1+1 ),
+     $                        DWORK( M+N1+1 ), DWORK( 2*M+N1+1 ),
+     $                        Q2( N1+1, N1+1 ), LDQ2, Q1( N1+1, N1+1 ),
+     $                        LDQ1, DWORK( 3*M+1 ), LDWORK-2*M, BWORK,
+     $                        INFO )
+                  IF( INFO.NE.0 ) THEN
+                     IF( INFO.GE.1 .AND. INFO.LE.N2 ) THEN
+                        INFO = 3
+                        RETURN
+                     ELSE
+                        INFO = 4
+                        RETURN
+                     END IF
+                  END IF
+                  IF( N1.EQ.1 ) THEN
+                     Q1( 1, 1 ) = ONE
+                     Q2( 1, 1 ) = ONE
+                  END IF
+               END IF
+               CALL DLASET( 'Full', N2, N1, ZERO, ZERO, Q1( N1+1, 1 ),
+     $                      LDQ1 )
+               CALL DLASET( 'Full', N1, N2, ZERO, ZERO, Q1( 1, N1+1 ),
+     $                      LDQ1 )
+               CALL DLASET( 'Full', N2, N1, ZERO, ZERO, Q2( N1+1, 1 ),
+     $                      LDQ2 )
+               CALL DLASET( 'Full', N1, N2, ZERO, ZERO, Q2( 1, N1+1 ),
+     $                      LDQ2 )
+               RETURN
+            END IF
             IF( N1.EQ.1 ) THEN
                DUM( 1 )  = A( 1, 1 )
                DUM( 2 )  = A( 2, 1 )
@@ -309,32 +349,63 @@ C        Note that N1 and N2 are interchanged for UPLO = 'L'.
 C
          IEVS = 3*N1 + 1
          IAEV = IEVS + 3*N1
-         CALL DLACPY( 'Full', M, M, A, LDA, Q1, LDQ1 )
-         CALL DLACPY( 'Full', M, M, B, LDB, Q2, LDQ2 )
-         IF( LTRIU ) THEN
-C
-C           Workspace: need   4*N1.
-C
-            CALL DHGEQZ( 'Eigenvalues', 'No Vector', 'No Vector', N1, 1,
-     $                   N1, Q1, LDQ1, Q2, LDQ2, DWORK, DWORK( N1+1 ),
-     $                   DWORK( 2*N1+1 ), DUM, 1, DUM, 1, DWORK( IEVS ),
-     $                   LDWORK-IEVS+1, INFO )
+         IF( N1.EQ.1 ) THEN
+            DWORK( 1 ) = A( 1, 1 )*SIGN( ONE, B( 1, 1 ) )
+            DWORK( 2 ) = ZERO
+            DWORK( 3 ) = ABS( B( 1, 1 ) )
          ELSE
+            SFMIN = DLAMCH( 'Safemin' )
+            Q1( 1, 1 ) = A( 1, 1 )
+            Q1( 2, 1 ) = A( 2, 1 )
+            Q1( 1, 2 ) = A( 1, 2 )
+            Q1( 2, 2 ) = A( 2, 2 )
+            Q2( 1, 1 ) = B( 1, 1 )
+            Q2( 2, 1 ) = B( 2, 1 )
+            Q2( 1, 2 ) = B( 1, 2 )
+            Q2( 2, 2 ) = B( 2, 2 )
+            IF( .NOT.LTRIU .AND. B( 2, 1 ).NE.ZERO ) THEN
 C
-C           Workspace: need   11*N1;
-C                      prefer larger.
+C              Triangularize B11 and update A11.
 C
-            CALL DGGEV( 'No Vector', 'No Vector', N1, Q1, LDQ1, Q2,
-     $                  LDQ2, DWORK, DWORK( N1+1 ), DWORK( 2*N1+1 ),
-     $                  DUM, 1, DUM, 1, DWORK( IEVS ), LDWORK-IEVS+1,
-     $                  INFO )
-         END IF
-         IF( INFO.GE.1 .AND. INFO.LE.N1 ) THEN
-            INFO = 1
-            RETURN
-         ELSE IF( INFO.GT.N1 ) THEN
-            INFO = 2
-            RETURN
+               A11 = ABS( Q1( 1, 1 ) )
+               A22 = ABS( Q1( 2, 2 ) )
+               B11 = ABS( Q2( 1, 1 ) )
+               B22 = ABS( Q2( 2, 2 ) )
+               MX  = MAX( A11 + ABS( Q1( 2, 1 ) ),
+     $                    A22 + ABS( Q1( 1, 2 ) ),
+     $                    B11 + ABS( Q2( 2, 1 ) ),
+     $                    B22 + ABS( Q2( 1, 2 ) ), SFMIN )
+               Q1( 1, 1 ) = Q1( 1, 1 ) / MX
+               Q1( 2, 1 ) = Q1( 2, 1 ) / MX
+               Q1( 1, 2 ) = Q1( 1, 2 ) / MX
+               Q1( 2, 2 ) = Q1( 2, 2 ) / MX
+               Q2( 1, 1 ) = Q2( 1, 1 ) / MX
+               Q2( 2, 1 ) = Q2( 2, 1 ) / MX
+               Q2( 1, 2 ) = Q2( 1, 2 ) / MX
+               Q2( 2, 2 ) = Q2( 2, 2 ) / MX
+               CALL DLARTG( Q2( 1, 1 ), Q2( 2, 1 ), CO,  SI,  E )
+               CALL DLARTG( Q2( 2, 2 ), Q2( 2, 1 ), CO1, SI1, G )
+               IF( ABS( CO *B( 2, 1 ) - SI *B( 1, 1 ) ).LE.
+     $             ABS( CO1*B( 2, 1 ) - SI1*B( 2, 2 ) ) ) THEN
+                  CALL DROT( 2, Q1( 1, 1 ), LDQ1, Q1( 2, 1 ), LDQ1, CO,
+     $                       SI )
+                  Q2( 1, 1 ) = E
+                  TMP = Q2( 1, 2 )
+                  Q2( 1, 2 ) = SI*Q2( 2, 2 ) + CO*TMP
+                  Q2( 2, 2 ) = CO*Q2( 2, 2 ) - SI*TMP
+               ELSE
+                  CALL DROT( 2, Q1( 1, 2 ), 1, Q1( 1, 1 ), 1, CO1, SI1 )
+                  Q2( 2, 2 ) = G
+                  TMP = Q2( 1, 2 )
+                  Q2( 1, 2 ) = SI1*Q2( 1, 1 ) + CO1*TMP
+                  Q2( 1, 1 ) = CO1*Q2( 1, 1 ) - SI1*TMP
+               END IF
+               Q2( 2, 1 ) = ZERO
+            END IF
+            CALL DLAG2( Q1, LDQ1, Q2, LDQ2, SFMIN*HUND, DWORK( 2*N1+1 ),
+     $                  DWORK( 2*N1+2 ), DWORK( 1 ), DWORK( 2 ),
+     $                  DWORK( N1+1 ) )
+            DWORK( N1+2 ) = -DWORK( N1+1 )
          END IF
 C
          ITMP = IAEV + 3*M
@@ -368,11 +439,9 @@ C
                IF( INFO.GE.1 .AND. INFO.LE.M ) THEN
                   INFO = 3
                   RETURN
-               ELSE IF( INFO.NE.M+2 ) THEN
+               ELSE
                   INFO = 4
                   RETURN
-               ELSE
-                  INFO = 0
                END IF
             END IF
          END IF
@@ -446,6 +515,14 @@ C        Workspace: need   7*N1 + 7*N2 + 16;
 C                   prefer larger.
 C
          ITMP = 3*M + 1
+         NRA = DLANHS( '1-norm', M, A, LDA, DWORK )
+         NRB = DLANHS( '1-norm', M, B, LDB, DWORK )
+         IDM( 1 ) = 2
+         IDM( 2 ) = 2
+         CALL MB01QD( 'Hess', M, M, 0, 0, NRA, ONE, 2, IDM, A, LDA,
+     $                INFO )
+         CALL MB01QD( 'Hess', M, M, 0, 0, NRB, ONE, 2, IDM, B, LDB,
+     $                INFO )
          CALL DTGSEN( 0, .TRUE., .TRUE., SLCT, M, A, LDA, B, LDB, DWORK,
      $                DWORK( M+1 ), DWORK( 2*M+1 ), Q2, LDQ2, Q1, LDQ1,
      $                IDUM, TMP, TMP, DUM, DWORK( ITMP ), LDWORK-ITMP+1,
@@ -454,6 +531,11 @@ C
             INFO = 5
             RETURN
          END IF
+C
+         CALL MB01QD( 'Hess', M, M, 0, 0, ONE, NRA, 0, IDM, A, LDA,
+     $                INFO )
+         CALL MB01QD( 'Hess', M, M, 0, 0, ONE, NRB, 0, IDM, B, LDB,
+     $                INFO )
 C
 C        Interchange N1 and N2.
 C
@@ -504,63 +586,53 @@ C
 C
 C        2-by-2 case.
 C
-         IF( .NOT.LUPLO ) THEN
-            TMP = A( 1, 1 )
-            A( 1, 1 ) =  A( 2, 2 )
-            A( 2, 2 ) = TMP
-            A( 1, 2 ) = -A( 2, 1 )
-            A( 2, 1 ) = ZERO
-            TMP = B( 1, 1 )
-            B( 1, 1 ) =  B( 2, 2 )
-            B( 2, 2 ) = TMP
-            B( 1, 2 ) = -B( 2, 1 )
-            B( 2, 1 ) = ZERO
-         END IF
-C
-         G = A( 1, 1 )*B( 2, 2 ) - A( 2, 2 )*B( 1, 1 )
-         IF( ABS( G ).LT.HUND*PREC*ABS( A( 1, 1 )*B( 2, 2 ) ) ) THEN
-C
-C           The eigenvalues might be too close to interchange them.
-C
-            IF( LUPLO ) THEN
-               CALL DLASET( 'Full', 2, 2, ZERO, ONE, Q1, LDQ1 )
-               CALL DLASET( 'Full', 2, 2, ZERO, ONE, Q2, LDQ2 )
-            ELSE
-               Q1( 1, 1 ) = ZERO
-               Q1( 2, 1 ) = -ONE
-               Q1( 1, 2 ) =  ONE
-               Q1( 2, 2 ) = ZERO
-               Q2( 1, 1 ) = ZERO
-               Q2( 2, 1 ) = -ONE
-               Q2( 1, 2 ) =  ONE
-               Q2( 2, 2 ) = ZERO
-            END IF
+         IF( .NOT.LUPLO .AND. A( 2, 1 ).EQ.ZERO
+     $                  .AND. B( 2, 1 ).EQ.ZERO ) THEN
+            CALL DLASET( 'Full', M, M, ZERO, ONE, Q1, LDQ1 )
+            CALL DLASET( 'Full', M, M, ZERO, ONE, Q2, LDQ2 )
+            RETURN
+         ELSE IF( LUPLO ) THEN
+            CALL DLASET( 'Full', M, M, ZERO, ONE, Q1, LDQ1 )
+            CALL DLASET( 'Full', M, M, ZERO, ONE, Q2, LDQ2 )
          ELSE
-            E = A( 1, 2 )*B( 2, 2 ) - A( 2, 2 )*B( 1, 2 )
-            CALL DLARTG( E, G, CO1, SI1, TMP )
-            E = A( 1, 2 )*B( 1, 1 ) - A( 1, 1 )*B( 1, 2 )
-            CALL DLARTG( E, G, CO2, SI2, TMP )
-C
-            IF( LUPLO ) THEN
-               Q1( 1, 1 ) =  CO1
-               Q1( 2, 1 ) = -SI1
-               Q1( 1, 2 ) =  SI1
-               Q1( 2, 2 ) =  CO1
-               Q2( 1, 1 ) =  CO2
-               Q2( 2, 1 ) = -SI2
-               Q2( 1, 2 ) =  SI2
-               Q2( 2, 2 ) =  CO2
-            ELSE
-               Q1( 1, 1 ) = -SI1
-               Q1( 2, 1 ) = -CO1
-               Q1( 1, 2 ) =  CO1
-               Q1( 2, 2 ) = -SI1
-               Q2( 1, 1 ) = -SI2
-               Q2( 2, 1 ) = -CO2
-               Q2( 1, 2 ) =  CO2
-               Q2( 2, 2 ) = -SI2
-            END IF
+            TMP        =  A( 1, 1 )
+            A( 1, 1 )  =  A( 2, 2 )
+            A( 2, 2 )  =  TMP
+            A( 1, 2 )  = -A( 2, 1 )
+            A( 2, 1 )  =  ZERO
+            TMP        =  B( 1, 1 )
+            B( 1, 1 )  =  B( 2, 2 )
+            B( 2, 2 )  =  TMP
+            B( 1, 2 )  = -B( 2, 1 )
+            B( 2, 1 )  =  ZERO
+            Q1( 1, 1 ) =  ZERO
+            Q1( 2, 1 ) = -ONE
+            Q1( 1, 2 ) =  ONE
+            Q1( 2, 2 ) =  ZERO
+            Q2( 1, 1 ) =  ZERO
+            Q2( 2, 1 ) = -ONE
+            Q2( 1, 2 ) =  ONE
+            Q2( 2, 2 ) =  ZERO
          END IF
+         A11 = A( 1, 1 )
+         A22 = A( 2, 2 )
+         B11 = B( 1, 1 )
+         B22 = B( 2, 2 )
+         MX  = MAX( ABS( A11 ), ABS( A22 ), ABS( A( 1, 2 ) ),
+     $              ABS( B11 ), ABS( B22 ), ABS( B( 1, 2 ) ),
+     $              DLAMCH( 'Safemin' ) )
+         AS( 1, 1 ) = A11 / MX
+         AS( 2, 1 ) = ZERO
+         AS( 1, 2 ) = A( 1, 2 ) / MX
+         AS( 2, 2 ) = A22 / MX
+         BS( 1, 1 ) = B11 / MX
+         BS( 2, 2 ) = B22 / MX
+         BS( 1, 2 ) = B( 1, 2 ) / MX 
+         CALL DLACPY( 'Full', M, M, A, LDA, AS, 2 )
+         CALL DLACPY( 'Full', M, M, B, LDB, BS, 2 )
+         CALL DTGEX2( .TRUE., .TRUE., M, AS, 2, BS, 2, Q2, LDQ2, Q1,
+     $                LDQ1, 1, 1, 1, DUM, 8, ITMP )
+C
       END IF
 C
       RETURN

@@ -4,24 +4,6 @@
      $                   US, LDUS, UU, LDUU, LWORK, IWORK, DWORK,
      $                   LDWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To compute the stable and unstable invariant subspaces for a
@@ -45,10 +27,18 @@ C             used for computing bases of the invariant subspaces:
 C             = 'S':  compute the n-dimensional basis from a set of
 C                     n vectors;
 C             = 'L':  compute the n-dimensional basis from a set of
-C                     2*n vectors.
+C                     2*n vectors;
+C             = 'Q':  quick return of the set of n vectors;
+C             = 'R':  quick return of the set of 2*n vectors.
 C             When in doubt, use METH = 'S'. In some cases, METH = 'L'
 C             may result in more accurately computed invariant
 C             subspaces, see [1].
+C             Options METH = 'Q' or METH = 'R' return the range vectors
+C             Y = [ Y1; Y2 ], where Y1 and Y2 have 2*n rows and n or 2*n
+C             columns, respectively, which can be directly used, e.g.,
+C             for finding the (stabilizing) solution of a Riccati
+C             equation, by solving X*Y1 = Y2. Note that Y1 might be
+C             singular when METH = 'Q'.
 C
 C     STAB    CHARACTER*1
 C             Specifies the type of invariant subspaces to be computed:
@@ -75,7 +65,8 @@ C             MB03XD. Note that if the data is further post-processed,
 C             e.g., for solving an algebraic Riccati equation, it is
 C             recommended to delay inverse balancing (in particular the
 C             scaling part) and apply it to the final result only,
-C             see [2].
+C             see [2]. Inverse balancing is not used by this routine
+C             if METH = 'Q' or METH = 'R'.
 C
 C     ORTBAL  CHARACTER*1
 C             If BALANC <> 'N', this option specifies how inverse
@@ -106,12 +97,13 @@ C             The order of the matrices S, T and G. N >= 0.
 C
 C     MM      (input) INTEGER
 C             The number of columns in the arrays US and/or UU.
-C             If WHICH = 'A' and METH = 'S',  MM >=   N;
-C             if WHICH = 'A' and METH = 'L',  MM >= 2*N;
-C             if WHICH = 'S',                 MM >=   M.
-C             The minimal values above for MM give the numbers of
-C             vectors to be used for computing a basis for the
-C             invariant subspace(s).
+C             If WHICH = 'A' and (METH = 'S' or METH = 'Q'),  MM =   N;
+C             if WHICH = 'A' and (METH = 'L' or METH = 'R'),  MM = 2*N;
+C             if WHICH = 'S',                                 MM =   M.
+C             The values above for MM give the numbers of vectors to be
+C             returned, if METH = 'Q' or METH = 'R', or the numbers of
+C             vectors to be used for computing a basis for the invariant
+C             subspace(s), if METH = 'S' or METH = 'L', or WHICH = 'S'.
 C
 C     ILO     (input) INTEGER
 C             If BALANC <> 'N', then ILO is the integer returned by
@@ -142,15 +134,15 @@ C     LDT     INTEGER
 C             The leading dimension of the array T.  LDT >= max(1,N).
 C
 C     G       (input/output) DOUBLE PRECISION array, dimension (LDG,N)
-C             On entry, if METH = 'L', the leading N-by-N part of this
-C             array must contain a general matrix G.
-C             On exit, if METH = 'L', the leading N-by-N part of this
-C             array is overwritten.
-C             This array is not referenced if METH = 'S'.
+C             On entry, if METH = 'L' or METH = 'R', the leading N-by-N
+C             part of this array must contain a general matrix G.
+C             On exit, if METH = 'L' or METH = 'R', the leading N-by-N
+C             part of this array is overwritten.
+C             This array is not referenced if METH = 'S' or METH = 'Q'.
 C
 C     LDG     INTEGER
 C             The leading dimension of the array G.  LDG >= 1.
-C             LDG >= max(1,N) if METH = 'L'.
+C             LDG >= max(1,N) if METH = 'L' or METH = 'R'.
 C
 C     U1      (input/output) DOUBLE PRECISION array, dimension (LDU1,N)
 C             On entry, the leading N-by-N part of this array must
@@ -203,20 +195,24 @@ C             to roundoff errors, these numbers may differ from the
 C             eigenvalues computed by MB03XD.
 C
 C     US      (output) DOUBLE PRECISION array, dimension (LDUS,MM)
-C             On exit, if STAB = 'S' or STAB = 'B', the leading 2*N-by-M
-C             part of this array contains a basis for the stable
-C             invariant subspace belonging to the selected eigenvalues.
-C             This basis is orthogonal unless ORTBAL = 'A'.
+C             On exit, if STAB = 'S' or STAB = 'B', the leading
+C             2*N-by-MM part of this array contains a basis for the
+C             stable invariant subspace belonging to the selected
+C             eigenvalues, if METH = 'S' or METH = 'L', or the range
+C             vectors Y, if METH = 'Q' or METH = 'R' (see parameter
+C             METH). This basis is orthogonal unless ORTBAL = 'A'.
 C
 C     LDUS    INTEGER
 C             The leading dimension of the array US.  LDUS >= 1.
 C             If STAB = 'S' or STAB = 'B',  LDUS >= 2*N.
 C
 C     UU      (output) DOUBLE PRECISION array, dimension (LDUU,MM)
-C             On exit, if STAB = 'U' or STAB = 'B', the leading 2*N-by-M
-C             part of this array contains a basis for the unstable
-C             invariant subspace belonging to the selected eigenvalues.
-C             This basis is orthogonal unless ORTBAL = 'A'.
+C             On exit, if STAB = 'U' or STAB = 'B', the leading
+C             2*N-by-MM part of this array contains a basis for the
+C             unstable invariant subspace belonging to the selected
+C             eigenvalues, if METH = 'S' or METH = 'L', or the range
+C             vectors Y, if METH = 'Q' or METH = 'R' (see parameter
+C             METH). This basis is orthogonal unless ORTBAL = 'A'.
 C
 C     LDUU    INTEGER
 C             The leading dimension of the array UU.  LDUU >= 1.
@@ -226,11 +222,13 @@ C     Workspace
 C
 C     LWORK   LOGICAL array, dimension (2*N)
 C             This array is only referenced if WHICH = 'A' and
-C             METH = 'L'.
+C             (METH = 'L' or METH = 'R').
 C
-C     IWORK   INTEGER array, dimension (2*N),
-C             This array is only referenced if WHICH = 'A' and
-C             METH = 'L'.
+C     IWORK   INTEGER array, dimension (LIWORK)
+C             LIWORK = 2*N, if WHICH = 'A' and METH = 'L';
+C             LIWORK = N,   if WHICH = 'A' and METH = 'S';
+C             LIWORK = 0,   if WHICH = 'A' and METH = 'Q' or METH = 'R';
+C             LIWORK = M,   if WHICH = 'S'.
 C
 C     DWORK   DOUBLE PRECISION array, dimension (LDWORK)
 C             On exit, if INFO = 0,  DWORK(1)  returns the optimal
@@ -240,13 +238,20 @@ C             value of LDWORK.
 C
 C     LDWORK  INTEGER
 C             The length of the array DWORK.
-C             If WHICH = 'S' or METH = 'S':
+C             If WHICH = 'S' or METH = 'S' or METH = 'Q':
 C                LDWORK >= MAX( 1, 4*M*M + MAX( 8*M, 4*N ) ).
-C             If WHICH = 'A' and METH = 'L' and
+C             If WHICH = 'A' and (METH = 'L' or METH = 'R') and
 C                ( STAB = 'U' or STAB = 'S' ):
 C                LDWORK >= MAX( 1, 2*N*N + 2*N, 8*N ).
-C             If WHICH = 'A' and METH = 'L' and STAB = 'B':
+C             If WHICH = 'A' and (METH = 'L' or METH = 'R') and
+C                STAB = 'B':
 C                LDWORK >= 8*N + 1.
+C
+C             If LDWORK = -1, then a workspace query is assumed;
+C             the routine only calculates the optimal size of the
+C             DWORK array, returns this value as the first entry of
+C             the DWORK array, and no error message related to LDWORK
+C             is issued by XERBLA.
 C
 C     Error Indicator
 C
@@ -263,7 +268,13 @@ C             = 3:  the QR algorithm failed to compute some Schur form
 C                   in MB03ZA;
 C             = 4:  reordering of the Hamiltonian Schur form in routine
 C                   MB03TD failed because some eigenvalues are too close
-C                   to separate.
+C                   to separate;
+C             = 5:  the computed stable invariant subspace for
+C                   METH = 'S' is inaccurate. This may be taken as a
+C                   warning and a suggestion to try METH = 'L';
+C             = 6:  the computed unstable invariant subspace for
+C                   METH = 'S' is inaccurate. This may be taken as a
+C                   warning and a suggestion to try METH = 'L'.
 C
 C     METHOD
 C
@@ -286,7 +297,7 @@ C         pp. 17-43, 1997.
 C
 C     [2] Benner, P.
 C         Symplectic balancing of Hamiltonian matrices.
-C         SIAM J. Sci. Comput., 22 (5), pp. 1885-1904, 2000.
+C         SIAM J. Sci. Comput., 22 (5), pp. 1885-1904, 2001.
 C
 C     CONTRIBUTORS
 C
@@ -296,6 +307,7 @@ C
 C     REVISIONS
 C
 C     V. Sima, June 2008 (SLICOT version of the HAPACK routine DHASUB).
+C     V. Sima, Aug. 2011, Mar. 2015, Apr. 2015.
 C
 C     KEYWORDS
 C
@@ -304,8 +316,8 @@ C
 C     ******************************************************************
 C
 C     .. Parameters ..
-      DOUBLE PRECISION  ZERO, ONE
-      PARAMETER         ( ZERO = 0.0D0, ONE = 1.0D0 )
+      DOUBLE PRECISION  ZERO, ONE, HUNDRD
+      PARAMETER         ( ZERO = 0.0D0, ONE = 1.0D0, HUNDRD = 1.0D2 )
 C     .. Scalar Arguments ..
       CHARACTER         BALANC, METH, ORTBAL, STAB, WHICH
       INTEGER           ILO, INFO, LDG, LDS, LDT, LDU1, LDU2, LDUS,
@@ -318,16 +330,18 @@ C     .. Array Arguments ..
      $                  UU(LDUU,*), V1(LDV1,*), V2(LDV2,*), WI(*),
      $                  WR(*)
 C     .. Local Scalars ..
-      LOGICAL           LALL, LBAL, LBEF, LEXT, LUS, LUU, PAIR
+      LOGICAL           LALL, LBAL, LBEF, LEXT, LQUERY, LRIC, LUS, LUU,
+     $                  PAIR
       INTEGER           I, IERR, J, K, PDW, PW, WRKMIN, WRKOPT
-      DOUBLE PRECISION  TEMP
+      DOUBLE PRECISION  NRMIN, RCOND, TEMP, TOL
 C     .. External Functions ..
       LOGICAL           LSAME
-      EXTERNAL          LSAME
+      DOUBLE PRECISION  DASUM, DLAMCH, DLANGE
+      EXTERNAL          DASUM, DLAMCH, DLANGE, LSAME
 C     .. External Subroutines ..
       EXTERNAL          DAXPY, DGEMM, DGEQP3, DGEQRF, DLACPY, DLASCL,
-     $                  DLASET, DORGQR, DSCAL, MB01UX, MB03TD, MB03ZA,
-     $                  MB04DI, XERBLA
+     $                  DLASET, DORGQR, DSCAL, DTRCON, MB01UX, MB03TD,
+     $                  MB03ZA, MB04DI, XERBLA
 C     .. Intrinsic Functions ..
       INTRINSIC         DBLE, INT, MAX, MIN
 C
@@ -337,10 +351,11 @@ C     Decode and check input parameters.
 C
       LALL = LSAME( WHICH, 'A' )
       IF ( LALL ) THEN
-         LEXT = LSAME( METH, 'L' )
+         LEXT = LSAME( METH, 'L' ) .OR. LSAME( METH, 'R' )
       ELSE
          LEXT = .FALSE.
       END IF
+      LRIC = LSAME( METH,   'Q' ) .OR. LSAME( METH,   'R' )
       LUS  = LSAME( STAB,   'S' ) .OR. LSAME( STAB,   'B' )
       LUU  = LSAME( STAB,   'U' ) .OR. LSAME( STAB,   'B' )
       LBAL = LSAME( BALANC, 'P' ) .OR. LSAME( BALANC, 'S' ) .OR.
@@ -349,14 +364,11 @@ C
       IF ( LBAL )
      $   LBEF = LSAME( ORTBAL, 'B' )
 C
-      WRKMIN = 1
-      WRKOPT = WRKMIN
-C
       INFO = 0
 C
       IF ( .NOT.LALL .AND. .NOT.LSAME( WHICH, 'S' ) ) THEN
          INFO = -1
-      ELSE IF ( LALL .AND. ( .NOT.LEXT .AND.
+      ELSE IF ( LALL .AND. ( .NOT.LEXT .AND. .NOT.LRIC .AND.
      $                       .NOT.LSAME( METH, 'S' ) ) ) THEN
          INFO = -2
       ELSE IF ( .NOT.LUS .AND. .NOT.LUU ) THEN
@@ -398,15 +410,19 @@ C
 C
 C        Compute workspace requirements.
 C
-         IF ( .NOT.LEXT ) THEN
-            WRKOPT = MAX( WRKOPT, 4*M*M + MAX( 8*M, 4*N ) )
+         IF ( MIN( M, MM ).EQ.0 ) THEN
+            WRKMIN = 1
+         ELSE IF ( .NOT.LEXT ) THEN
+            WRKMIN = MAX( 1, 4*M*M + MAX( 8*M, 4*N ) )
          ELSE
             IF ( LUS.AND.LUU ) THEN
-               WRKOPT = MAX( WRKOPT, 8*N + 1 )
+               WRKMIN = MAX( 1, 8*N + 1 )
             ELSE
-               WRKOPT = MAX( WRKOPT, 2*N*N + 2*N, 8*N )
+               WRKMIN = MAX( 1, 2*N*N + 2*N, 8*N )
             END IF
          END IF
+         WRKOPT = WRKMIN
+         LQUERY = LDWORK.EQ.-1
 C
          IF ( N.LT.0 ) THEN
             INFO = -7
@@ -432,6 +448,43 @@ C
             INFO = -29
          ELSE IF ( LDUU.LT.1 .OR. ( LUU .AND. LDUU.LT.2*N ) ) THEN
             INFO = -31
+         ELSE IF ( LQUERY ) THEN
+            IF ( MIN( N, MM ).EQ.0 ) THEN
+               DWORK(1) = ONE
+               RETURN
+            ELSE IF ( .NOT.LEXT ) THEN
+               CALL MB01UX( 'Right', 'Upper', 'No Transpose', N, M, ONE,
+     $                      DWORK, M, V1, LDV1, DWORK, -1, IERR )
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + 2*M*M )
+               IF ( LUS .OR. LUU ) THEN
+                  CALL DGEQRF( 2*N, M, DWORK, 2*N, DWORK, DWORK, -1,
+     $                         IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + M )
+                  CALL DORGQR( 2*N, M, M, DWORK, 2*N, DWORK, DWORK, -1,
+     $                         IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + M )
+               END IF
+            ELSE
+               CALL MB01UX( 'Right', 'Upper', 'No Transpose', 2*N, N,
+     $                      ONE, DWORK, N, DWORK, 2*N, DWORK, -1, IERR )
+               IF ( ( LUS .AND.( .NOT.LUU ) ) .OR.
+     $              ( LUU .AND.( .NOT.LUS ) ) ) THEN
+                  I = 2*N*N
+               ELSE
+                  I = 0
+               END IF
+               WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + I )
+               IF ( LUS .OR. LUU ) THEN
+                  CALL DGEQP3( 2*N, 2*N, DWORK, 2*N, IWORK, DWORK,
+     $                         DWORK, -1, IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + 2*N )
+                  CALL DORGQR( 2*N, 2*N, N, DWORK, 2*N, DWORK, DWORK,
+     $                         -1, IERR )
+                  WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) + 2*N )
+               END IF
+            END IF
+            DWORK(1) = DBLE( WRKOPT )
+            RETURN
          ELSE IF ( LDWORK.LT.WRKMIN ) THEN
             INFO = -35
             DWORK(1) = DBLE( WRKMIN )
@@ -447,7 +500,7 @@ C
 C
 C     Quick return if possible.
 C
-      IF ( MIN( M, N ).EQ.0 ) THEN
+      IF ( MIN( MM, N ).EQ.0 ) THEN
          DWORK(1) = ONE
          RETURN
       END IF
@@ -505,15 +558,45 @@ C
      $                DWORK(PW+M), 2*M, U2, LDU2, DWORK(PDW),
      $                LDWORK-PDW+1, IERR )
 C
+C        Save the base vectors and quick check of their independence.
+C
+         NRMIN = DLAMCH( 'Overflow' )
+         TOL   = DLAMCH( 'Precision' )*HUNDRD
          IF ( LUS ) THEN
             DO 40 J = 1, M
                CALL DAXPY( N, ONE, U2(1,J), 1, US(N+1,J), 1 )
+               TEMP = DASUM( 2*M, US(1,J), 1 )
+               IF ( TEMP.LT.NRMIN )
+     $            NRMIN = TEMP
    40       CONTINUE
+            IF ( NRMIN.LE.MAX( DLANGE( '1', 2*M, M, US, LDUS, DWORK ),
+     $                         ONE )*TOL )
+     $         INFO = 5
          END IF
          IF ( LUU ) THEN
             DO 50 J = 1, M
                CALL DAXPY( N, -ONE, U2(1,J), 1, UU(N+1,J), 1 )
+               TEMP = DASUM( 2*M, UU(1,J), 1 )
+               IF ( TEMP.LT.NRMIN )
+     $            NRMIN = TEMP
    50       CONTINUE
+            IF ( NRMIN.LE.MAX( DLANGE( '1', 2*M, M, UU, LDUU, DWORK ),
+     $                         ONE )*TOL )
+     $         INFO = 6
+         END IF
+C
+C        Quick return of the range vectors.
+C
+         IF ( LRIC ) THEN
+            IF ( LBAL ) THEN
+               IF ( LUS )
+     $            CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, M, US,
+     $                         LDUS, US(N+1,1), LDUS, IERR )
+               IF ( LUU )
+     $            CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, M, UU,
+     $                         LDUU, UU(N+1,1), LDUU, IERR )
+            END IF
+            RETURN
          END IF
 C
 C        Orthonormalize obtained bases and apply inverse balancing
@@ -529,18 +612,26 @@ C
          END IF
 C
          IF ( LUS ) THEN
-            CALL DGEQRF( 2*N, M, US, LDUS, DWORK(1), DWORK(M+1),
-     $                   LDWORK-M, IERR )
-               WRKOPT = MAX( WRKOPT, INT( DWORK(M+1) ) + M )
-            CALL DORGQR( 2*N, M, M, US, LDUS, DWORK(1), DWORK(M+1),
+            CALL DGEQRF( 2*N, M, US, LDUS, DWORK, DWORK(M+1), LDWORK-M,
+     $                   IERR )
+            WRKOPT = MAX( WRKOPT, INT( DWORK(M+1) ) + M )
+            CALL DTRCON( '1', 'Upper', 'NotUnit', M, US, LDUS, RCOND,
+     $                   DWORK(M+1), IWORK, IERR )      
+            IF ( RCOND.LE.TOL )
+     $         INFO = 5
+            CALL DORGQR( 2*N, M, M, US, LDUS, DWORK, DWORK(M+1),
      $                   LDWORK-M, IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(M+1) ) + M )
          END IF
          IF ( LUU ) THEN
-            CALL DGEQRF( 2*N, M, UU, LDUU, DWORK(1), DWORK(M+1),
-     $                   LDWORK-M, IERR )
+            CALL DGEQRF( 2*N, M, UU, LDUU, DWORK, DWORK(M+1), LDWORK-M,
+     $                   IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(M+1) ) + M )
-            CALL DORGQR( 2*N, M, M, UU, LDUU, DWORK(1), DWORK(M+1),
+            CALL DTRCON( '1', 'Upper', 'NotUnit', M, UU, LDUU, RCOND,
+     $                   DWORK(M+1), IWORK, IERR )      
+            IF ( RCOND.LE.TOL )
+     $         INFO = 6
+            CALL DORGQR( 2*N, M, M, UU, LDUU, DWORK, DWORK(M+1),
      $                   LDWORK-M, IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(M+1) ) + M )
          END IF
@@ -579,7 +670,6 @@ C
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   US(1,N+1), LDUS, G, LDG, DWORK, LDWORK,
      $                   IERR )
-            WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
 C
             DO 70 J = 1, N
                CALL DAXPY( J, ONE, G(J,1), LDG, G(1,J), 1 )
@@ -595,7 +685,7 @@ C
      $                   IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(PDW) ) + PDW - 1 )
 C
-C           DW2 <- DW2 - U2*W21
+C           DW2 <- DW2 + U2*W21
 C
             CALL DLACPY( 'All', N, N, U2, LDU2, US, LDUS )
             CALL MB01UX( 'Right', 'Upper', 'No Transpose', N, N, ONE,
@@ -622,7 +712,6 @@ C
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   US(1,N+1), LDUS, V1, LDV1, DWORK, LDWORK,
      $                   IERR )
-            WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   US(1,N+1), LDUS, V2, LDV2, DWORK, LDWORK,
      $                   IERR )
@@ -668,7 +757,6 @@ C
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   UU(1,N+1), LDUU, G, LDG, DWORK, LDWORK,
      $                   IERR )
-            WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
             DO 120 J = 1, N
                CALL DAXPY( J, ONE, G(J,1), LDG, G(1,J), 1 )
   120       CONTINUE
@@ -710,7 +798,6 @@ C
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   UU(1,N+1), LDUU, V1, LDV1, DWORK, LDWORK,
      $                   IERR )
-            WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   UU(1,N+1), LDUU, V2, LDV2, DWORK, LDWORK,
      $                   IERR )
@@ -755,12 +842,11 @@ C
             CALL MB01UX( 'Right', 'Lower', 'No Transpose', N, N, ONE,
      $                   US(1,N+1), LDUS, G, LDG, DWORK, LDWORK,
      $                   IERR )
-            WRKOPT = MAX( WRKOPT, INT( DWORK(1) ) )
             DO 170 J = 1, N
                CALL DAXPY( J, ONE, G(J,1), LDG, G(1,J), 1 )
   170       CONTINUE
 C
-C           UU = [ V1 -V2; U1 -U2 ]*diag(W11,W21)
+C           UU = [ V1 U1; -V2 -U2 ]*diag(W11,W21)
 C
             CALL DLACPY( 'All', N, N, V1, LDV1, UU, LDUU )
             CALL DLACPY( 'All', N, N, V2, LDV2, UU(N+1,1), LDUU )
@@ -847,15 +933,29 @@ C
      $                  V2, LDV2, U1, LDU1, ONE, US(N+1,N+1), LDUS )
          END IF
 C
+C        Quick return of the range vectors.
+C
+         IF ( LRIC ) THEN
+            IF ( LBAL ) THEN
+               IF ( LUS )
+     $            CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, MM,
+     $                         US, LDUS, US(N+1,1), LDUS, IERR )
+               IF ( LUU )
+     $            CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, MM,
+     $                         UU, LDUU, UU(N+1,1), LDUU, IERR )
+            END IF
+            RETURN
+         END IF
+C
 C        Orthonormalize obtained bases and apply inverse balancing
 C        transformation.
 C
          IF ( LBAL .AND. LBEF ) THEN
             IF ( LUS )
-     $         CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, N, US,
+     $         CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, MM, US,
      $                      LDUS, US(N+1,1), LDUS, IERR )
             IF ( LUU )
-     $         CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, N, UU,
+     $         CALL MB04DI( BALANC, 'Positive', N, ILO, SCALE, MM, UU,
      $                      LDUU, UU(N+1,1), LDUU, IERR )
          END IF
 C
@@ -865,18 +965,18 @@ C
             IWORK(J) = 0
   240    CONTINUE
          IF ( LUS ) THEN
-            CALL DGEQP3( 2*N, 2*N, US, LDUS, IWORK, DWORK, DWORK(2*N+1),
+            CALL DGEQP3( 2*N, MM, US, LDUS, IWORK, DWORK, DWORK(2*N+1),
      $                   LDWORK-2*N, IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(2*N+1) ) + 2*N )
-            CALL DORGQR( 2*N, 2*N, N, US, LDUS, DWORK, DWORK(2*N+1),
+            CALL DORGQR( 2*N, MM, N, US, LDUS, DWORK, DWORK(2*N+1),
      $                   LDWORK-2*N, IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(2*N+1) ) + 2*N )
          END IF
          IF ( LUU ) THEN
-            CALL DGEQP3( 2*N, 2*N, UU, LDUU, IWORK, DWORK, DWORK(2*N+1),
+            CALL DGEQP3( 2*N, MM, UU, LDUU, IWORK, DWORK, DWORK(2*N+1),
      $                   LDWORK-2*N, IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(2*N+1) ) + 2*N )
-            CALL DORGQR( 2*N, 2*N, N, UU, LDUU, DWORK, DWORK(2*N+1),
+            CALL DORGQR( 2*N, MM, N, UU, LDUU, DWORK, DWORK(2*N+1),
      $                   LDWORK-2*N, IERR )
             WRKOPT = MAX( WRKOPT, INT( DWORK(2*N+1) ) + 2*N )
          END IF

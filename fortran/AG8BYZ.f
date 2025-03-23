@@ -2,24 +2,6 @@
      $                   NR, PR, NINFZ, DINFZ, NKRONL, INFZ, KRONL,
      $                   TOL, IWORK, DWORK, ZWORK, LZWORK, INFO )
 C
-C     SLICOT RELEASE 5.0.
-C
-C     Copyright (c) 2002-2010 NICONET e.V.
-C
-C     This program is free software: you can redistribute it and/or
-C     modify it under the terms of the GNU General Public License as
-C     published by the Free Software Foundation, either version 2 of
-C     the License, or (at your option) any later version.
-C
-C     This program is distributed in the hope that it will be useful,
-C     but WITHOUT ANY WARRANTY; without even the implied warranty of
-C     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-C     GNU General Public License for more details.
-C
-C     You should have received a copy of the GNU General Public License
-C     along with this program.  If not, see
-C     <http://www.gnu.org/licenses/>.
-C
 C     PURPOSE
 C
 C     To extract from the (N+P)-by-(M+N) descriptor system pencil
@@ -233,6 +215,7 @@ C     REVISIONS
 C
 C     V. Sima, Research Institute for Informatics, Bucharest, Apr. 2009.
 C     V. Sima, Jan. 2010, following Bujanovic and Drmac's suggestion.
+C     V. Sima, Apr. 2011.
 C
 C     KEYWORDS
 C
@@ -262,8 +245,8 @@ C     .. Local Scalars ..
       LOGICAL            LQUERY
       INTEGER            I, ICOL, ILAST, IRC, IROW, ISMAX, ISMIN, ITAU,
      $                   J, JLAST, JWORK1, JWORK2, K, MN, MN1, MNR,
-     $                   MNTAU, MP1, MPM, MUI, MUIM1, N1, NB, NBLCKS,
-     $                   PN, RANK, RO, RO1, SIGMA, TAUI, WRKOPT
+     $                   MNTAU, MP1, MPM, MUI, MUIM1, N1, NBLCKS, PN,
+     $                   RANK, RO, RO1, SIGMA, TAUI, WRKOPT
       DOUBLE PRECISION   C, RCOND, SMAX, SMAXPR, SMIN, SMINPR, T, TOLZ,
      $                   TT
       COMPLEX*16         C1, C2, S, S1, S2, TC
@@ -271,9 +254,9 @@ C     .. Local Arrays ..
       DOUBLE PRECISION   SVAL(3)
       COMPLEX*16         DUM(1)
 C     .. External Functions ..
-      INTEGER            IDAMAX, ILAENV
+      INTEGER            IDAMAX
       DOUBLE PRECISION   DLAMCH, DZNRM2
-      EXTERNAL           DLAMCH, DZNRM2, IDAMAX, ILAENV
+      EXTERNAL           DLAMCH, DZNRM2, IDAMAX
 C     .. External Subroutines ..
       EXTERNAL           MB3OYZ, XERBLA, ZCOPY, ZLAIC1, ZLAPMT, ZLARFG,
      $                   ZLARTG, ZLASET, ZLATZM, ZROT, ZSWAP, ZUNMQR
@@ -310,9 +293,10 @@ C
                IF( FIRST ) THEN
                   WRKOPT = MAX( WRKOPT, MPM + MAX( 3*M-1, N ) )
                   IF( LQUERY ) THEN
-                     NB = MIN( 64, ILAENV( 1, 'ZUNMQR', 'LC', P, N,
-     $                                     MPM, -1 ) )
-                     WRKOPT = MAX( WRKOPT, MPM + MAX( 1, N )*NB )
+                     CALL ZUNMQR( 'Left', 'ConjTranspose', P, N, MPM,
+     $                            ABCD, LDABCD, ZWORK, ABCD, LDABCD,
+     $                            ZWORK, -1, INFO )
+                     WRKOPT = MAX( WRKOPT, MPM + INT( ZWORK(1) ) )
                   END IF
                END IF
             END IF
